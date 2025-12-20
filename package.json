@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "lottie-react-native": "^7.3.4",
+    "react-native-google-places-autocomplete": "^2.6.1",
+    "react-native-linear-gradient": "^2.8.3"
+  }
+}
