@@ -1,388 +1,655 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Image,
+  Modal,
+  TouchableOpacity,
+  Pressable,
+  TextInput,
+  Platform,
+  KeyboardAvoidingView,
+} from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useLocalSearchParams } from "expo-router";
+import { Stack } from "expo-router";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, Modal, TouchableOpacity, Pressable, TextInput, Button, Platform } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { useLocalSearchParams } from 'expo-router';
-import { ProviderService } from '../models/ProviderService';
+import { ProviderService } from "../models/ProviderService";
+import { fetchProviderServiceById } from "../api/providerServiceDetail";
+import { createBooking } from "../api";
 
-import { fetchProviderServiceById } from '../api/providerServiceDetail';
-import { createBooking } from '../api';
+const BASE_URL = "http://192.168.1.31:8000";
 
-const BASE_URL = 'http://192.168.1.31:8000'; // Change to your backend IP if needed
+function resolveImg(img?: string | null) {
+  if (!img) return null;
+  return img.startsWith("http") ? img : `${BASE_URL}${img}`;
+}
+
+function money(amount: any, currency?: string) {
+  const n = typeof amount === "number" ? amount : Number(amount);
+  if (!Number.isFinite(n)) return null;
+  return `${n.toLocaleString()} ${currency || ""}`.trim();
+}
 
 export default function ServiceDetailScreen() {
   const { providerServiceId } = useLocalSearchParams();
+
   const [service, setService] = useState<ProviderService | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Booking modal state (must be inside the component)
+  // booking
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
-  const [bookingName, setBookingName] = useState('');
-  const [bookingPhone, setBookingPhone] = useState('');
+  const [bookingName, setBookingName] = useState("");
+  const [bookingPhone, setBookingPhone] = useState("");
   const [bookingDate, setBookingDate] = useState(new Date());
   const [bookingTime, setBookingTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
-  const [bookingError, setBookingError] = useState<string|null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
+  const id = useMemo(() => {
+    const raw = providerServiceId;
+    const v = Array.isArray(raw) ? raw[0] : raw;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : NaN;
+  }, [providerServiceId]);
+
   useEffect(() => {
-    if (!providerServiceId) {
-      setError('No service ID provided.');
+    if (!Number.isFinite(id)) {
+      setError("No service ID provided.");
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setError(null);
-    fetchProviderServiceById(Number(providerServiceId))
-      .then(data => {
+
+    fetchProviderServiceById(id)
+      .then((data) => {
         setService(data);
         setLoading(false);
       })
-      .catch(err => {
-        setError('Failed to fetch service details.');
+      .catch(() => {
+        setError("Failed to fetch service details.");
         setLoading(false);
       });
-  }, [providerServiceId]);
+  }, [id]);
+
+  const images = useMemo(() => {
+    if (!service) return [];
+    return [service.image1, service.image2, service.image3, service.image4, service.image5]
+      .map((x) => resolveImg(x as any))
+      .filter(Boolean) as string[];
+  }, [service]);
+
+  const headerTitle = service?.title || "Service Details";
+
+  const priceText =
+    money((service as any)?.base_price, (service as any)?.currency) || "Price on request";
+
+  const stats = useMemo(
+    () => [
+      {
+        icon: "tag-outline",
+        label: "Pricing",
+        value: (service as any)?.pricing_type || "—",
+      },
+      {
+        icon: "calendar-check-outline",
+        label: "Booking",
+        value: (service as any)?.booking_mode || "—",
+      },
+      {
+        icon: "account-group-outline",
+        label: "Passengers",
+        value: String((service as any)?.max_passengers ?? "—"),
+      },
+      {
+        icon: "bag-suitcase-outline",
+        label: "Luggage",
+        value: String((service as any)?.max_luggage ?? "—"),
+      },
+    ],
+    [service]
+  );
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#FFA726" style={{ marginTop: 40 }} />
+        <Stack.Screen options={{ title: headerTitle }} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#5EC6C6" />
+          <Text style={styles.centerText}>Loading service...</Text>
+        </View>
       </View>
     );
   }
 
-  if (error) {
+  if (error || !service) {
     return (
       <View style={styles.container}>
-        <Text style={styles.error}>{error}</Text>
+        <Stack.Screen options={{ title: headerTitle }} />
+        <View style={styles.center}>
+          <Ionicons name="alert-circle-outline" size={24} color="#FFB4A2" />
+          <Text style={styles.error}>{error || "Service not found."}</Text>
+        </View>
       </View>
     );
   }
-
-  if (!service) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.error}>Service details not found.</Text>
-      </View>
-    );
-  }
-
-  // Debug: log the service object
-  // console.log('Service detail:', service);
-
-  // Gather all images (main + others)
-  const images = [service.image1, service.image2, service.image3, service.image4, service.image5]
-    .filter(Boolean)
-    .map(img => (img as string).startsWith('http') ? img : `${BASE_URL}${img}`);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      {/* Main Image */}
-      {images[0] && (
-        <TouchableOpacity onPress={() => { setSelectedImage(images[0]); setModalVisible(true); }}>
-          <Image source={{ uri: images[0] }} style={styles.mainImage} resizeMode="cover" />
-        </TouchableOpacity>
-      )}
-      {/* Thumbnails */}
-      <View style={styles.thumbnailRow}>
-        {images.slice(1).map((img, idx) => (
-          <TouchableOpacity key={idx} onPress={() => { setSelectedImage(img); setModalVisible(true); }}>
-            <Image source={{ uri: img }} style={styles.thumbnail} resizeMode="cover" />
+    <View style={styles.container}>
+      <Stack.Screen options={{ title: service.title }} />
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* HERO */}
+        {images[0] ? (
+          <TouchableOpacity
+            activeOpacity={0.95}
+            onPress={() => {
+              setSelectedImage(images[0]);
+              setModalVisible(true);
+            }}
+          >
+            <View style={styles.hero}>
+              <Image source={{ uri: images[0] }} style={styles.heroImg} resizeMode="cover" />
+              <View style={styles.heroFade} />
+              <View style={styles.heroTopRow}>
+                <View style={styles.pill}>
+                  <Ionicons name="images-outline" size={14} color="#0f1a19" />
+                  <Text style={styles.pillText}>{images.length} photos</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.pillBtn}
+                  activeOpacity={0.9}
+                  onPress={() => setBookingModalVisible(true)}
+                >
+                  <Ionicons name="flash-outline" size={14} color="#0f1a19" />
+                  <Text style={styles.pillText}>Book</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.heroBottom}>
+                <Text style={styles.heroTitle} numberOfLines={2}>
+                  {service.title}
+                </Text>
+                <View style={styles.heroPriceRow}>
+                  <Text style={styles.heroPriceLabel}>Starting from</Text>
+                  <Text style={styles.heroPrice}>{priceText}</Text>
+                </View>
+              </View>
+            </View>
           </TouchableOpacity>
-        ))}
-      </View>
-      {/* Modal Preview */}
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalBackground}>
-          <Pressable style={styles.modalBackground} onPress={() => setModalVisible(false)} />
-          <View style={styles.modalContent}>
-            {selectedImage && (
-              <Image source={{ uri: selectedImage }} style={styles.modalImage} resizeMode="contain" />
-            )}
-            <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeButtonText}>×</Text>
+        ) : null}
+
+        {/* THUMBNAILS */}
+        {images.length > 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbScroll}
+          >
+            {images.slice(1).map((img, idx) => (
+              <TouchableOpacity
+                key={idx}
+                activeOpacity={0.9}
+                onPress={() => {
+                  setSelectedImage(img);
+                  setModalVisible(true);
+                }}
+                style={styles.thumbWrap}
+              >
+                <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="cover" />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {/* DETAILS CARD */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardHeaderTitle}>About this service</Text>
+            <View style={styles.badge}>
+              <Ionicons name="shield-checkmark-outline" size={14} color="#5EC6C6" />
+              <Text style={styles.badgeText}>Verified</Text>
+            </View>
+          </View>
+
+          <Text style={styles.desc}>
+            {(service as any)?.full_description || (service as any)?.short_description || "No description provided."}
+          </Text>
+
+          {/* STATS GRID */}
+          <View style={styles.grid}>
+            {stats.map((s) => (
+              <View key={s.label} style={styles.gridItem}>
+                <View style={styles.gridIcon}>
+                  <MaterialCommunityIcons name={s.icon as any} size={18} color="#5EC6C6" />
+                </View>
+                <Text style={styles.gridLabel}>{s.label}</Text>
+                <Text style={styles.gridValue} numberOfLines={1}>
+                  {s.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* CTA BAR */}
+          <View style={styles.ctaBar}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ctaSmall}>Total</Text>
+              <Text style={styles.ctaBig}>{priceText}</Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.92}
+              style={styles.ctaBtn}
+              onPress={() => setBookingModalVisible(true)}
+            >
+              <Ionicons name="calendar-outline" size={16} color="#0f1a19" />
+              <Text style={styles.ctaBtnText}>Book now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* IMAGE MODAL */}
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalBg}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} />
+          <View style={styles.modalBody}>
+            {selectedImage ? (
+              <Image source={{ uri: selectedImage }} style={styles.modalImg} resizeMode="contain" />
+            ) : null}
+            <TouchableOpacity style={styles.modalClose} onPress={() => setModalVisible(false)} activeOpacity={0.85}>
+              <Ionicons name="close" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-      {/* Card-like details */}
-      <View style={styles.card}>
-        <Text style={styles.title}>{service.title}</Text>
-        <Text style={styles.desc}>{service.full_description || service.short_description}</Text>
-        <Text style={styles.section}>Price: <Text style={styles.value}>{service.base_price} {service.currency}</Text></Text>
-        <Text style={styles.section}>Pricing Type: <Text style={styles.value}>{service.pricing_type}</Text></Text>
-        <Text style={styles.section}>Booking Mode: <Text style={styles.value}>{service.booking_mode}</Text></Text>
-        <Text style={styles.section}>Max Passengers: <Text style={styles.value}>{service.max_passengers}</Text></Text>
-        <Text style={styles.section}>Max Luggage: <Text style={styles.value}>{service.max_luggage}</Text></Text>
-        {/* Add more fields as needed */}
-        <TouchableOpacity style={styles.bookBtn} onPress={() => setBookingModalVisible(true)}>
-          <Text style={styles.bookBtnText}>Book Now</Text>
-        </TouchableOpacity>
-      </View>
-      {/* Booking Modal */}
-      <Modal visible={bookingModalVisible} transparent animationType="slide">
-        <View style={styles.bookingModalOverlay}>
-          <View style={styles.bookingModalCard}>
-            <Text style={styles.bookingModalHeader}>Book Service</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Your Name"
-              placeholderTextColor="#aaa"
-              value={bookingName}
-              onChangeText={setBookingName}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Phone Number"
-              placeholderTextColor="#aaa"
-              value={bookingPhone}
-              onChangeText={setBookingPhone}
-              keyboardType="phone-pad"
-            />
-            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.inputPicker}>
-              <Text style={styles.inputPickerText}>Date: {bookingDate.toLocaleDateString()}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowTimePicker(true)} style={styles.inputPicker}>
-              <Text style={styles.inputPickerText}>Time: {bookingTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-            </TouchableOpacity>
+
+      {/* BOOKING MODAL */}
+      <Modal
+        visible={bookingModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBookingModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.sheetOverlay}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setBookingModalVisible(false)} />
+
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+
+            <View style={styles.sheetHeaderRow}>
+              <View>
+                <Text style={styles.sheetTitle}>Book Service</Text>
+                <Text style={styles.sheetSub} numberOfLines={1}>
+                  {service.title}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.sheetClose}
+                onPress={() => setBookingModalVisible(false)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="close" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputRow}>
+              <Ionicons name="person-outline" size={16} color="#9AA4B2" />
+              <TextInput
+                style={styles.input}
+                placeholder="Your Name"
+                placeholderTextColor="#9AA4B2"
+                value={bookingName}
+                onChangeText={setBookingName}
+              />
+            </View>
+
+            <View style={styles.inputRow}>
+              <Ionicons name="call-outline" size={16} color="#9AA4B2" />
+              <TextInput
+                style={styles.input}
+                placeholder="Phone Number"
+                placeholderTextColor="#9AA4B2"
+                value={bookingPhone}
+                onChangeText={setBookingPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.pickerRow}>
+              <TouchableOpacity
+                style={[styles.picker, { flex: 1 }]}
+                activeOpacity={0.9}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={16} color="#B0BEC5" />
+                <Text style={styles.pickerText}>{bookingDate.toLocaleDateString()}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.picker, { flex: 1 }]}
+                activeOpacity={0.9}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time-outline" size={16} color="#B0BEC5" />
+                <Text style={styles.pickerText}>
+                  {bookingTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {showDatePicker && (
               <DateTimePicker
                 value={bookingDate}
                 mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={(_, date) => {
                   setShowDatePicker(false);
                   if (date) setBookingDate(date);
                 }}
               />
             )}
+
             {showTimePicker && (
               <DateTimePicker
                 value={bookingTime}
                 mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={(_, time) => {
                   setShowTimePicker(false);
                   if (time) setBookingTime(time);
                 }}
               />
             )}
-            {bookingError && <Text style={styles.bookingError}>{bookingError}</Text>}
-            {bookingSuccess && <Text style={styles.bookingSuccess}>Booking successful!</Text>}
-            <View style={styles.bookingModalBtnRow}>
+
+            {bookingError ? <Text style={styles.msgError}>{bookingError}</Text> : null}
+            {bookingSuccess ? <Text style={styles.msgSuccess}>Booking successful!</Text> : null}
+
+            <View style={styles.sheetBtnRow}>
               <TouchableOpacity
-                style={[styles.bookBtn, styles.bookingSubmitBtn, bookingLoading && { opacity: 0.6 }]}
+                style={[styles.primaryBtn, bookingLoading && { opacity: 0.6 }]}
                 disabled={bookingLoading}
+                activeOpacity={0.92}
                 onPress={async () => {
                   setBookingLoading(true);
                   setBookingError(null);
                   setBookingSuccess(false);
                   try {
                     await createBooking({
-                      provider_service: service.id,
+                      provider_service: (service as any).id,
                       name: bookingName,
                       phone: bookingPhone,
-                      date: bookingDate.toISOString().split('T')[0],
-                      time: bookingTime.toTimeString().slice(0,5),
+                      date: bookingDate.toISOString().split("T")[0],
+                      time: bookingTime.toTimeString().slice(0, 5),
                     });
                     setBookingSuccess(true);
-                  } catch (e) {
-                    setBookingError('Booking failed. Please try again.');
+                  } catch {
+                    setBookingError("Booking failed. Please try again.");
                   } finally {
                     setBookingLoading(false);
                   }
                 }}
               >
-                <Text style={styles.bookBtnText}>{bookingLoading ? 'Booking...' : 'Submit'}</Text>
+                <Text style={styles.primaryText}>{bookingLoading ? "Booking..." : "Confirm booking"}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.bookBtn, styles.bookingCancelBtn]} onPress={() => setBookingModalVisible(false)}>
-                <Text style={styles.bookBtnText}>Cancel</Text>
+
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                activeOpacity={0.92}
+                onPress={() => setBookingModalVisible(false)}
+              >
+                <Text style={styles.secondaryText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#23272F' },
-  mainImage: {
-    width: '100%',
-    height: 220,
-    borderRadius: 16,
-    marginBottom: 14,
-    backgroundColor: '#23272F',
+  container: { flex: 1, backgroundColor: "#23272F" },
+  content: { padding: 16, paddingBottom: 28 },
+
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  centerText: { marginTop: 10, color: "#B0BEC5", fontWeight: "700" },
+  error: { marginTop: 10, color: "#FFB4A2", textAlign: "center", fontWeight: "900" },
+
+  hero: {
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "#1F232B",
   },
-  thumbnailRow: {
-    flexDirection: 'row',
-    marginBottom: 18,
-    gap: 8,
-  },
-  thumbnail: {
-    width: 70,
-    height: 70,
-    borderRadius: 10,
-    marginRight: 8,
-    backgroundColor: '#23272F',
-  },
-  modalBackground: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    position: 'absolute',
-    top: 0,
+  heroImg: { width: "100%", height: 260, backgroundColor: "#1F232B" },
+  heroFade: {
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: 140,
+    backgroundColor: "rgba(0,0,0,0.38)",
   },
-  modalImage: {
-    width: '90%',
-    height: '70%',
-    borderRadius: 16,
-    backgroundColor: '#23272F',
-    zIndex: 2,
+  heroTopRow: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 30,
-    right: 30,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 3,
+  pill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.88)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
   },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 28,
-    lineHeight: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  pillBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFA726",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
   },
+  pillText: { color: "#0f1a19", fontWeight: "900", fontSize: 12 },
+
+  heroBottom: { position: "absolute", left: 12, right: 12, bottom: 12 },
+  heroTitle: { color: "#fff", fontWeight: "900", fontSize: 20, marginBottom: 8 },
+  heroPriceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  heroPriceLabel: { color: "#E6EDF3", opacity: 0.9, fontWeight: "800", fontSize: 12 },
+  heroPrice: { color: "#FFA726", fontWeight: "900", fontSize: 14 },
+
+  thumbScroll: { marginTop: 12, paddingVertical: 2, paddingRight: 6 },
+  thumbWrap: { marginRight: 10 },
+  thumbImg: { width: 84, height: 84, borderRadius: 18, backgroundColor: "#1F232B" },
+
   card: {
-    backgroundColor: '#23272F',
-    borderRadius: 16,
-    padding: 18,
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    elevation: 2,
+    marginTop: 14,
+    backgroundColor: "#2D313A",
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
-  bookBtn: {
-    backgroundColor: '#FFA726',
-    borderRadius: 10,
-    paddingVertical: 12,
-    marginTop: 18,
-    alignItems: 'center',
-    shadowColor: '#FFA726',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 2,
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  cardHeaderTitle: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(94,198,198,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(94,198,198,0.18)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
-  bookBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
-    letterSpacing: 1,
+  badgeText: { color: "#5EC6C6", fontWeight: "900", fontSize: 12 },
+
+  desc: { color: "#B0BEC5", lineHeight: 18, fontWeight: "600" },
+
+  grid: { marginTop: 14, flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  gridItem: {
+    width: "48%",
+    backgroundColor: "rgba(0,0,0,0.16)",
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
-  bookingModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  gridIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 14,
+    backgroundColor: "rgba(94,198,198,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(94,198,198,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
   },
-  bookingModalCard: {
-    width: '90%',
-    backgroundColor: '#23272F',
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-    alignItems: 'stretch',
-  },
-  bookingModalHeader: {
-    color: '#FFA726',
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 18,
-    textAlign: 'center',
-    letterSpacing: 1,
-  },
-  bookingModalBtnRow: {
-    flexDirection: 'row',
-    marginTop: 22,
-    justifyContent: 'space-between',
+  gridLabel: { color: "#98A2B3", fontWeight: "900", fontSize: 12 },
+  gridValue: { color: "#fff", fontWeight: "900", fontSize: 13, marginTop: 4 },
+
+  ctaBar: {
+    marginTop: 14,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
-  },
-  bookingSubmitBtn: {
-    backgroundColor: '#5EC6C6',
-    flex: 1,
-    marginRight: 6,
-  },
-  bookingCancelBtn: {
-    backgroundColor: '#E91E63',
-    flex: 1,
-    marginLeft: 6,
-  },
-  bookingError: {
-    color: 'red',
-    marginTop: 10,
-    textAlign: 'center',
-    fontSize: 15,
-  },
-  bookingSuccess: {
-    color: '#5EC6C6',
-    marginTop: 10,
-    textAlign: 'center',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  input: {
-    backgroundColor: '#2D313A',
-    color: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    fontSize: 16,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: "rgba(255,255,255,0.06)",
   },
-  inputPicker: {
-    backgroundColor: '#2D313A',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  ctaSmall: { color: "#98A2B3", fontWeight: "900", fontSize: 12 },
+  ctaBig: { color: "#fff", fontWeight: "900", fontSize: 16, marginTop: 4 },
+  ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#5EC6C6",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  ctaBtnText: { color: "#0f1a19", fontWeight: "900" },
+
+  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.92)", justifyContent: "center", alignItems: "center" },
+  modalBody: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
+  modalImg: { width: "92%", height: "72%", borderRadius: 18, backgroundColor: "#1F232B" },
+  modalClose: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 60 : 40,
+    right: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.70)", justifyContent: "flex-end" },
+  sheet: {
+    backgroundColor: "#23272F",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: "rgba(255,255,255,0.06)",
   },
-  inputPickerText: {
-    color: '#fff',
-    fontSize: 16,
+  sheetHandle: {
+    alignSelf: "center",
+    width: 56,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    marginBottom: 10,
   },
-  title: { color: '#FFA726', fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
-  desc: { color: '#B0BEC5', fontSize: 16, marginBottom: 16 },
-  section: { color: '#fff', fontSize: 16, marginTop: 8 },
-  value: { color: '#5EC6C6', fontWeight: 'bold' },
-  error: { color: 'red', textAlign: 'center', marginTop: 40 },
+  sheetHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  sheetTitle: { color: "#FFA726", fontWeight: "900", fontSize: 18 },
+  sheetSub: { color: "#B0BEC5", fontWeight: "700", marginTop: 2, maxWidth: 220 },
+  sheetClose: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: "#2D313A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#2D313A",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  input: { flex: 1, color: "#fff", fontWeight: "700" },
+
+  pickerRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  picker: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#2D313A",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  pickerText: { color: "#fff", fontWeight: "800" },
+
+  msgError: { color: "#FFB4A2", textAlign: "center", fontWeight: "900", marginTop: 4 },
+  msgSuccess: { color: "#5EC6C6", textAlign: "center", fontWeight: "900", marginTop: 4 },
+
+  sheetBtnRow: { flexDirection: "row", gap: 10, marginTop: 10, marginBottom: 6 },
+  primaryBtn: {
+    flex: 1,
+    backgroundColor: "#5EC6C6",
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  primaryText: { color: "#0f1a19", fontWeight: "900" },
+  secondaryBtn: {
+    flex: 1,
+    backgroundColor: "#E91E63",
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  secondaryText: { color: "#fff", fontWeight: "900" },
 });

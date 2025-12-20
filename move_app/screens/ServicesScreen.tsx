@@ -1,23 +1,36 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
-import { Ionicons, FontAwesome5, MaterialIcons, MaterialCommunityIcons, Entypo } from '@expo/vector-icons';
-import { Service } from '../models/Service';
-import { fetchServices } from '../api/services';
-import { useRouter } from 'expo-router';
-
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import {
+  Ionicons,
+  MaterialCommunityIcons,
+  Entypo,
+} from "@expo/vector-icons";
+import { Service } from "../models/Service";
+import { fetchServices } from "../api/services";
+import { useRouter } from "expo-router";
 
 export default function ServicesScreen() {
   const router = useRouter();
-  // Improved icons and colors for each service
+
+  // ✅ same logic, just UI polish
   const ICON_MAP: Record<string, JSX.Element> = {
-    plane: <MaterialCommunityIcons name="airplane-takeoff" size={36} color="#5EC6C6" />,
-    briefcase: <MaterialCommunityIcons name="briefcase-variant" size={36} color="#FFA726" />,
-    heart: <Entypo name="heart" size={36} color="#E91E63" />,
-    road: <MaterialCommunityIcons name="highway" size={36} color="#FFD600" />,
-    car: <MaterialCommunityIcons name="car-sports" size={36} color="#FF6F00" />,
+    plane: <MaterialCommunityIcons name="airplane-takeoff" size={30} color="#5EC6C6" />,
+    briefcase: <MaterialCommunityIcons name="briefcase-variant" size={30} color="#FFA726" />,
+    heart: <Entypo name="heart" size={30} color="#E91E63" />,
+    road: <MaterialCommunityIcons name="highway" size={30} color="#FFD600" />,
+    car: <MaterialCommunityIcons name="car-sports" size={30} color="#FF6F00" />,
   };
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,22 +42,44 @@ export default function ServicesScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredServices = services.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.description.toLowerCase().includes(search.toLowerCase())
+  const filteredServices = services.filter(
+    (s) =>
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.description.toLowerCase().includes(search.toLowerCase())
   );
 
   const renderItem = ({ item }: { item: Service }) => (
     <TouchableOpacity
       style={styles.card}
-      activeOpacity={0.88}
-      onPress={() => router.push({ pathname: '/service-provided', params: { service: JSON.stringify(item) } })}
+      activeOpacity={0.9}
+      onPress={() =>
+        router.push({
+          pathname: "/service-provided",
+          params: { service: JSON.stringify(item) },
+        })
+      }
     >
-      <View style={styles.iconCircle}>
-        {ICON_MAP[item.icon] || <MaterialCommunityIcons name="car-sports" size={36} color="#FFA726" />}
+      <View style={styles.cardTop}>
+        <View style={styles.iconCircle}>
+          {ICON_MAP[item.icon] || (
+            <MaterialCommunityIcons name="car-sports" size={30} color="#FFA726" />
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="#98A2B3" />
       </View>
-      <Text style={styles.title}>{item.name}</Text>
-      <Text style={styles.desc}>{item.description}</Text>
+
+      <Text style={styles.title} numberOfLines={1}>
+        {item.name}
+      </Text>
+      <Text style={styles.desc} numberOfLines={2}>
+        {item.description}
+      </Text>
+
+      {/* <View style={styles.cardFooter}>
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>Explore</Text>
+        </View>
+      </View> */}
     </TouchableOpacity>
   );
 
@@ -52,39 +87,65 @@ export default function ServicesScreen() {
     <View style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchBarWrapper}>
-        <Ionicons name="search" size={22} color="#aaa" style={{ marginLeft: 10 }} />
+        <Ionicons name="search" size={20} color="#9AA4B2" style={{ marginLeft: 12 }} />
         <TextInput
           style={styles.searchBar}
           placeholder="Search services..."
-          placeholderTextColor="#aaa"
+          placeholderTextColor="#9AA4B2"
           value={search}
           onChangeText={setSearch}
         />
+        {!!search && (
+          <TouchableOpacity onPress={() => setSearch("")} style={styles.clearBtn} activeOpacity={0.8}>
+            <Ionicons name="close" size={18} color="#9AA4B2" />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Info Card/Banner */}
+      {/* Banner */}
       <View style={styles.infoCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <MaterialCommunityIcons name="star-circle" size={32} color="#FFA726" style={{ marginRight: 10 }} />
-          <Text style={styles.infoTitle}>New! Flight Booking</Text>
+        <View style={styles.infoRow}>
+          <View style={styles.infoIconWrap}>
+            <MaterialCommunityIcons name="star-circle" size={22} color="#FFA726" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.infoTitle}>New! Flight Booking</Text>
+            <Text style={styles.infoDesc} numberOfLines={2}>
+              Book local and international flights right from the app.
+            </Text>
+          </View>
+
+          <View style={styles.infoCTA}>
+            <Text style={styles.infoCTAText}>Try</Text>
+            <Ionicons name="chevron-forward" size={14} color="#0f1a19" />
+          </View>
         </View>
-        <Text style={styles.infoDesc}>Book local and international flights right from the app. Try it now!</Text>
       </View>
 
-      <Text style={styles.header}>BOOK NOW!</Text>
-      <View style={styles.labelContainer}>
-        <Text style={styles.labelText}>Premium rides for every occasion</Text>
+      {/* Heading */}
+      <View style={styles.headingWrap}>
+        <Text style={styles.header}>Book now</Text>
+        <Text style={styles.subHeader}>Premium rides for every occasion</Text>
       </View>
+
+      {/* Grid */}
       <View style={styles.gridWrapper}>
-        <FlatList
-          data={filteredServices}
-          renderItem={renderItem}
-          keyExtractor={item => item.id.toString()}
-          numColumns={2}
-          columnWrapperStyle={{ justifyContent: 'space-between' }}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#5EC6C6" />
+            <Text style={styles.loadingText}>Loading services...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredServices}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrap}
+            contentContainerStyle={{ paddingBottom: 24, paddingTop: 6 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
     </View>
   );
@@ -93,144 +154,144 @@ export default function ServicesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#23272F',
-    paddingHorizontal: 0,
-    paddingTop: 0,
+    backgroundColor: "#23272F",
+    paddingTop: Platform.OS === "ios" ? 18 : 26,
   },
+
+  /** Search */
   searchBarWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2D313A',
-    borderRadius: 16,
-    marginTop: 32,
-    marginHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2D313A",
+    borderRadius: 18,
+    marginHorizontal: 16,
+    marginTop: 14,
     marginBottom: 12,
-    height: 48,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.10,
-    shadowRadius: 4,
+    height: 50,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   searchBar: {
     flex: 1,
-    height: 48,
-    fontSize: 17,
-    color: '#fff',
-    backgroundColor: 'transparent',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    borderWidth: 0,
+    height: 50,
+    fontSize: 16,
+    color: "#fff",
+    paddingHorizontal: 10,
   },
+  clearBtn: {
+    width: 40,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  /** Banner */
   infoCard: {
-    backgroundColor: '#35736E',
+    marginHorizontal: 16,
+    marginBottom: 14,
+    padding: 14,
     borderRadius: 18,
-    marginHorizontal: 18,
-    marginBottom: 18,
-    padding: 18,
-    shadowColor: '#222',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
+    backgroundColor: "#35736E",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  infoTitle: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
-    marginBottom: 2,
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  infoIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  infoDesc: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 4,
-    opacity: 0.92,
+  infoTitle: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  infoDesc: { color: "rgba(255,255,255,0.92)", marginTop: 2, fontSize: 13, lineHeight: 17 },
+
+  infoCTA: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
   },
-  header: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    color: '#FFA726',
-    alignSelf: 'center',
-    letterSpacing: 1,
-    textShadowColor: '#2228',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-    marginTop: 8,
-  },
-  labelContainer: {
-    alignSelf: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 16,
-    marginBottom: 18,
-    shadowColor: '#222',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 4,
-  },
-  labelText: {
-    color: '#5EC6C6',
-    fontWeight: 'bold',
-    fontSize: 15,
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
+  infoCTAText: { fontWeight: "900", color: "#0f1a19", fontSize: 12 },
+
+  /** Heading */
+  headingWrap: { marginHorizontal: 16, marginBottom: 8 },
+  header: { fontSize: 22, fontWeight: "900", color: "#FFA726", letterSpacing: 0.3 },
+  subHeader: { marginTop: 4, color: "#B0BEC5", fontWeight: "600" },
+
+  /** Grid */
   gridWrapper: {
     flex: 1,
-    backgroundColor: '#23272F',
-    borderRadius: 22,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingTop: 6,
   },
+  columnWrap: { justifyContent: "space-between", paddingHorizontal: 6 },
+
+  /** Cards */
   card: {
     flex: 1,
-    aspectRatio: 1,
-    backgroundColor: '#2D313A',
+    minHeight: 170,
+    maxWidth: "48%",
+    backgroundColor: "#2D313A",
     borderRadius: 20,
-    margin: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    minWidth: 150,
-    maxWidth: '48%',
-    shadowColor: '#222',
-    shadowOffset: { width: 0, height: 3 },
+    padding: 14,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(94,198,198,0.25)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.16,
-    shadowRadius: 10,
-    borderWidth: 2,
-    borderColor: '#35736E',
-    transitionDuration: '200ms',
+    shadowRadius: 16,
+    elevation: 3,
   },
+  cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+
   iconCircle: {
-    borderRadius: 36,
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: '#FFA726',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.13,
-    shadowRadius: 8,
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
+
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-    marginTop: 4,
-    letterSpacing: 0.5,
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#fff",
   },
   desc: {
-    fontSize: 14,
-    color: '#B0BEC5',
-    marginTop: 4,
-    textAlign: 'center',
-    opacity: 0.96,
-    fontWeight: '500',
-    textShadowColor: '#35736E88',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginTop: 6,
+    fontSize: 13,
+    color: "#B0BEC5",
+    lineHeight: 16,
+    fontWeight: "600",
   },
+
+  cardFooter: { marginTop: 12, flexDirection: "row", justifyContent: "flex-start" },
+  pill: {
+    backgroundColor: "rgba(94,198,198,0.16)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(94,198,198,0.25)",
+  },
+  pillText: { color: "#5EC6C6", fontWeight: "900", fontSize: 12 },
+
+  /** Loading */
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  loadingText: { marginTop: 10, color: "#B0BEC5", fontWeight: "700" },
 });
