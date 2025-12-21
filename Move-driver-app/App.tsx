@@ -2,16 +2,19 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+
 import LoginScreen from "./screens/LoginScreen";
 import DriverRegistrationScreen from "./screens/DriverRegistrationScreen";
 import OtpVerificationScreen from "./screens/OtpVerificationScreen";
 import DashboardScreen from "./screens/DashboardScreen";
+import DocumentUploadScreen from "./screens/DocumentUploadScreen";
 
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   OtpVerification: { phone?: string } | undefined;
   Dashboard: undefined;
+  DocumentUpload: { token?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -39,6 +42,11 @@ export default function App() {
           name="Dashboard"
           component={DashboardScreen}
           options={{ title: "Dashboard" }}
+        />
+        <Stack.Screen
+          name="DocumentUpload"
+          component={DocumentUploadScreen}
+          options={{ title: "Upload Document" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

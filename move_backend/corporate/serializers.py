@@ -1,5 +1,31 @@
+
+
 from rest_framework import serializers
-from .models import Advert
+from .models import Driver, Advert
+
+class DriverRegistrationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Driver
+        fields = ['id', 'phone', 'email', 'full_name', 'vehicle_type', 'password']
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        driver = Driver(**validated_data)
+        driver.set_password(password)
+        driver.save()
+        return driver
+
+class DriverLoginSerializer(serializers.Serializer):
+    phone = serializers.CharField(required=False)
+    email = serializers.EmailField(required=False)
+    password = serializers.CharField(write_only=True)
+
+
+class OtpSerializer(serializers.Serializer):
+    phone = serializers.CharField(required=False)
+    email = serializers.EmailField(required=False)
+    otp_code = serializers.CharField()
 
 class AdvertSerializer(serializers.ModelSerializer):
     class Meta:

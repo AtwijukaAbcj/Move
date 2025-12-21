@@ -1,24 +1,36 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+
 
 export default function OtpVerificationScreen({ route, navigation }) {
   const phone = route?.params?.phone || "";
+  const email = route?.params?.email || "";
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [useEmail, setUseEmail] = useState(!!email);
 
   const onVerify = async () => {
     if (otp.trim().length < 4) {
-      Alert.alert("Invalid OTP", "Enter the code sent to your phone.");
+      Alert.alert("Invalid OTP", `Enter the code sent to your ${useEmail ? 'email' : 'phone'}.`);
       return;
     }
 
     try {
       setLoading(true);
-
-      // TODO: Replace with your API call
-      // await apiVerifyOtp({ phone, otp });
-
-      navigation.replace("Dashboard");
+      const res = await fetch("http://192.168.1.31:8000/api/corporate/driver/verify-otp/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(useEmail ? { email } : { phone }),
+          otp_code: otp,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.verified) {
+        navigation.replace("Dashboard");
+      } else {
+        Alert.alert("Verification failed", data.error || "Please try again.");
+      }
     } catch (e) {
       Alert.alert("Verification failed", "Please try again.");
     } finally {
@@ -32,36 +44,55 @@ export default function OtpVerificationScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Verify Phone</Text>
-        <Text style={styles.subtitle}>
-          Enter the OTP sent to <Text style={styles.bold}>{phone || "your number"}</Text>
-        </Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={60}
+    >
+      <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
+        <View style={styles.card}>
+          <Text style={styles.title}>Verify {useEmail ? 'Email' : 'Phone'}</Text>
+          <Text style={styles.subtitle}>
+            Enter the OTP sent to <Text style={styles.bold}>{useEmail ? email : phone || "your contact"}</Text>
+          </Text>
 
-        <TextInput
-          value={otp}
-          onChangeText={setOtp}
-          placeholder="Enter OTP"
-          keyboardType="number-pad"
-          style={styles.input}
-          maxLength={6}
-        />
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 10 }}>
+            {email ? (
+              <TouchableOpacity onPress={() => setUseEmail(false)} style={{ marginRight: 10 }}>
+                <Text style={{ color: useEmail ? '#b9c2d1' : '#2f66ff', fontWeight: useEmail ? '400' : '700' }}>Phone</Text>
+              </TouchableOpacity>
+            ) : null}
+            {email ? (
+              <TouchableOpacity onPress={() => setUseEmail(true)}>
+                <Text style={{ color: useEmail ? '#2f66ff' : '#b9c2d1', fontWeight: useEmail ? '700' : '400' }}>Email</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
-        <TouchableOpacity
-          style={[styles.button, loading ? styles.buttonDisabled : null]}
-          onPress={onVerify}
-          disabled={loading} // ✅ boolean
-          activeOpacity={0.85}
-        >
-          {loading ? <ActivityIndicator /> : <Text style={styles.buttonText}>Verify</Text>}
-        </TouchableOpacity>
+          <TextInput
+            value={otp}
+            onChangeText={setOtp}
+            placeholder="Enter OTP"
+            keyboardType="number-pad"
+            style={styles.input}
+            maxLength={6}
+          />
 
-        <TouchableOpacity onPress={onResend} style={styles.linkWrap}>
-          <Text style={styles.link}>Resend code</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <TouchableOpacity
+            style={[styles.button, loading ? styles.buttonDisabled : null]}
+            onPress={onVerify}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? <ActivityIndicator /> : <Text style={styles.buttonText}>Verify</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onResend} style={styles.linkWrap}>
+            <Text style={styles.link}>Resend code</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

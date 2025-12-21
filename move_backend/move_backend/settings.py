@@ -1,3 +1,23 @@
+# Django REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+# Use custom Driver model as the user model
+AUTH_USER_MODEL = 'corporate.Driver'
+# Email settings for OTP and notifications
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'mail.solichsystems.com'
+EMAIL_PORT = 465
+EMAIL_HOST_USER = 'info@solichsystems.com'
+EMAIL_HOST_PASSWORD = 'GY-kG%NpO7~ot+i'
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = True
+DEFAULT_FROM_EMAIL = 'SOLICH <info@solichsystems.com>'
 """
 Django settings for move_backend project.
 
@@ -38,6 +58,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken',
     'service_category',
     'service_provider',
     'provider_service',

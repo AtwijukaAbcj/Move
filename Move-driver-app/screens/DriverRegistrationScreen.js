@@ -32,12 +32,24 @@ export default function DriverRegistrationScreen({ navigation }) {
 
     try {
       setLoading(true);
-
-      // TODO: Replace with your API call
-      // await apiRegisterDriver({fullName, phone, email, vehicleType, password});
-
-      // Demo: after register -> OTP screen
-      navigation.navigate("OtpVerification", { phone });
+      const res = await fetch("http://192.168.1.31:8000/api/corporate/driver/register/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: fullName,
+          phone,
+          email,
+          vehicle_type: vehicleType,
+          password,
+          otp_method: "phone", // or "email" if you add a toggle
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        navigation.navigate("OtpVerification", { phone, email });
+      } else {
+        Alert.alert("Registration failed", data.error || JSON.stringify(data));
+      }
     } catch (e) {
       Alert.alert("Registration failed", "Please try again.");
     } finally {

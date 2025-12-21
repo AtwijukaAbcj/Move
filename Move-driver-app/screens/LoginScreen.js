@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { saveToken } from '../utils/storage';
 import {
   View,
   Text,
@@ -20,10 +21,33 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
+    let loginPayload = { password };
+    if (phoneOrEmail.match(/^[0-9+]+$/)) {
+      loginPayload.phone = phoneOrEmail;
+    } else if (phoneOrEmail.includes("@")) {
+      loginPayload.email = phoneOrEmail;
+    } else {
+      Alert.alert("Invalid input", "Enter a valid phone number or email address.");
+      return;
+    }
+
     try {
       setLoading(true);
-      // TODO: your login API call
-      navigation.replace("Dashboard");
+      const res = await fetch("http://192.168.1.31:8000/api/corporate/driver/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginPayload),
+      });
+      const data = await res.json();
+      if (res.ok && data.id) {
+        await saveToken('userId', String(data.id));
+        navigation.replace("Dashboard");
+      } else if (res.status === 403 && data.error === 'OTP not verified') {
+        // Redirect to OTP verification screen with phone/email
+        navigation.navigate("OtpVerification", { phone: data.phone, email: data.email });
+      } else {
+        Alert.alert("Login failed", data.error || "Try again.");
+      }
     } catch (e) {
       Alert.alert("Login failed", "Try again.");
     } finally {

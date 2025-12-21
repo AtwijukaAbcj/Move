@@ -16,10 +16,7 @@ export default function DashboardScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => {
-            // TODO: navigate to Document Upload screen when you create it
-            // navigation.navigate("Documents");
-          }}
+          onPress={() => navigation.navigate("DocumentUpload")}
           activeOpacity={0.85}
         >
           <Text style={styles.buttonText}>Upload Verification Documents</Text>
