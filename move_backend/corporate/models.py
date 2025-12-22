@@ -51,6 +51,20 @@ class Customer(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
+    groups = models.ManyToManyField(
+        'auth.Group',
+        related_name='customer_set',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        verbose_name='groups',
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        related_name='customer_set',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        verbose_name='user permissions',
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
@@ -83,6 +97,7 @@ class Driver(AbstractBaseUser, PermissionsMixin):
     full_name = models.CharField(max_length=255)
     vehicle_type = models.CharField(max_length=50, blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    is_online = models.BooleanField(default=False, help_text='Driver online/offline status')
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
     otp_code = models.CharField(max_length=6, blank=True, null=True)
@@ -93,6 +108,8 @@ class Driver(AbstractBaseUser, PermissionsMixin):
     car_image_1 = models.ImageField(upload_to='verification_docs/car_images/', blank=True, null=True)
     car_image_2 = models.ImageField(upload_to='verification_docs/car_images/', blank=True, null=True)
     inspection_report = models.FileField(upload_to='verification_docs/inspection_report/', blank=True, null=True)
+    is_approved = models.BooleanField(default=False, help_text='Admin approval status')
+    approval_notes = models.TextField(blank=True, null=True, help_text='Admin notes for approval/rejection')
     groups = models.ManyToManyField(
         'auth.Group',
         related_name='driver_set',
@@ -125,3 +142,52 @@ class Advert(models.Model):
 
     def __str__(self):
         return self.caption
+
+# Admin User model for backend management
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
+
+class UserManager(BaseUserManager):
+    def create_user(self, username, email=None, password=None, **extra_fields):
+        if not username:
+            raise ValueError('Users must have a username')
+        email = self.normalize_email(email)
+        user = self.model(username=username, email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(username, email, password, **extra_fields)
+
+class User(AbstractBaseUser, PermissionsMixin):
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(default=timezone.now)
+    groups = models.ManyToManyField(
+        'auth.Group',
+        related_name='adminuser_set',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        verbose_name='groups',
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        related_name='adminuser_set',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        verbose_name='user permissions',
+    )
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email']
+
+    objects = UserManager()
+
+    def __str__(self):
+        return self.username

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Advert, Driver, Customer
+from .models import Advert, Driver, Customer, User
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
     list_display = ('full_name', 'email', 'phone', 'is_active', 'date_joined')
@@ -19,3 +19,11 @@ class DriverAdmin(admin.ModelAdmin):
     list_display = ('full_name', 'phone', 'email', 'vehicle_type', 'is_active', 'otp_verified')
     list_filter = ('is_active', 'otp_verified', 'vehicle_type')
     search_fields = ('full_name', 'phone', 'email')
+
+
+# Register User model for backend/admin users
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    list_display = ('username', 'email', 'is_staff', 'is_superuser', 'is_active', 'date_joined')
+    list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
+    search_fields = ('username', 'email')

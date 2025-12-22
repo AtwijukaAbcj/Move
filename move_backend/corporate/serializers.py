@@ -1,11 +1,16 @@
 
+
 from rest_framework import serializers
 # Google Registration/Login Serializer
 class CustomerGoogleAuthSerializer(serializers.Serializer):
     email = serializers.EmailField()
     full_name = serializers.CharField()
     google_id = serializers.CharField()
-from .models import Customer
+from .models import Customer, Driver
+class DriverDashboardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Driver
+        fields = ['id', 'full_name', 'is_approved', 'is_online']
 
 class CustomerRegistrationSerializer(serializers.ModelSerializer):
     class Meta:

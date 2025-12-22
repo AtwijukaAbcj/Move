@@ -1,5 +1,5 @@
 from django.urls import path
-from .api_views import AdvertListCreateAPIView, DriverRegisterAPIView, DriverLoginAPIView, DriverOtpVerifyAPIView, DriverDocumentUploadAPIView, CustomerRegisterAPIView, CustomerLoginAPIView, CustomerGoogleAuthAPIView
+from .api_views import AdvertListCreateAPIView, DriverRegisterAPIView, DriverLoginAPIView, DriverOtpVerifyAPIView, DriverDocumentUploadAPIView, CustomerRegisterAPIView, CustomerLoginAPIView, CustomerGoogleAuthAPIView, DriverDashboardAPIView
 from .api_views_provider_service import ProviderServiceListView
 
 urlpatterns = [
@@ -12,4 +12,5 @@ urlpatterns = [
     path('customer/login/', CustomerLoginAPIView.as_view(), name='customer-login'),
     path('customer/google-auth/', CustomerGoogleAuthAPIView.as_view(), name='customer-google-auth'),
     path('provider-services/', ProviderServiceListView.as_view(), name='provider-service-list'),
+    path('driver/<int:driver_id>/status/', DriverDashboardAPIView.as_view(), name='driver-status'),
 ]

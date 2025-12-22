@@ -1,8 +1,24 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from .models import Customer
-from .serializers import CustomerRegistrationSerializer, CustomerLoginSerializer, CustomerGoogleAuthSerializer
+from .models import Customer, Driver
+from .serializers import CustomerRegistrationSerializer, CustomerLoginSerializer, CustomerGoogleAuthSerializer, DriverDashboardSerializer
+
+# API endpoint for driver dashboard/status
+from rest_framework.permissions import IsAuthenticated
+
+class DriverDashboardAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, driver_id=None, *args, **kwargs):
+        if not driver_id:
+            return Response({'error': 'Missing driver_id'}, status=400)
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Invalid driver_id'}, status=400)
+        serializer = DriverDashboardSerializer(driver)
+        return Response(serializer.data)
 # Google registration/login endpoint
 class CustomerGoogleAuthAPIView(APIView):
     permission_classes = [AllowAny]
