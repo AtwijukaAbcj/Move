@@ -1,2 +1,1 @@
-import ServiceDetailScreen from '../screens/ServiceDetailScreen';
-export default ServiceDetailScreen;
+export { default } from "../screens/ServiceDetailScreen";

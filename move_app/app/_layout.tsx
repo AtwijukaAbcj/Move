@@ -1,8 +1,4 @@
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -12,35 +8,50 @@ import "react-native-get-random-values";
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import Layout from "@/components/Layout";
+import { AuthProvider, useAuth } from "./auth-context"; // ✅ updated path
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function MainStack() {
   const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
+  const { user, loading } = useAuth();
+
+  const [fontsLoaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
 
-  if (!loaded) {
-    return null;
-  }
+  if (!fontsLoaded || loading) return null;
 
   return (
-    <Layout>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-          <Stack.Screen name="map" options={{ headerShown: false }} />
-        </Stack>
-      </ThemeProvider>
-    </Layout>
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        {!user ? (
+          <>
+            <Stack.Screen name="login" options={{ title: "Login" }} />
+            <Stack.Screen name="register" options={{ title: "Register" }} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="map" />
+            <Stack.Screen name="+not-found" />
+          </>
+        )}
+      </Stack>
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <Layout>
+        <MainStack />
+      </Layout>
+    </AuthProvider>
   );
 }

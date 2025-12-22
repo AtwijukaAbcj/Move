@@ -1,4 +1,29 @@
 
+from rest_framework import serializers
+# Google Registration/Login Serializer
+class CustomerGoogleAuthSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    full_name = serializers.CharField()
+    google_id = serializers.CharField()
+from .models import Customer
+
+class CustomerRegistrationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ['id', 'email', 'full_name', 'phone', 'password']
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        customer = Customer(**validated_data)
+        customer.set_password(password)
+        customer.save()
+        return customer
+
+class CustomerLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
 
 from rest_framework import serializers
 from .models import Driver, Advert

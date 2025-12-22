@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { useAuth } from "../app/auth-context";
+import { useRouter } from "expo-router";
 
 export default function RidesScreen() {
+  const { user } = useAuth();
+  const router = useRouter();
+  if (!user) {
+    router.replace("/login");
+    return null;
+  }
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
   const [region, setRegion] = useState({

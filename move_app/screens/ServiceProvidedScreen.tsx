@@ -3,11 +3,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons, Entypo } from '@expo/vector-icons';
 import { fetchProviderServicesByCategory } from '../api/providerServices';
+import { useAuth } from '../app/auth-context';
 import { useRoute, useNavigation, NavigationProp } from '@react-navigation/native';
 
 import { ProviderService } from '../models/ProviderService';
 
 export default function ServiceProvidedScreen() {
+  const { user } = useAuth();
+  console.log('[ServiceProvidedScreen] user from useAuth:', user);
   // Icon map for service types
   const ICON_MAP: Record<string, React.ReactElement> = {
     plane: <MaterialCommunityIcons name="airplane-takeoff" size={44} color="#5EC6C6" />,
@@ -22,6 +25,8 @@ export default function ServiceProvidedScreen() {
   if (typeof service === 'string') {
     try { service = JSON.parse(service); } catch {}
   }
+  // Debug log for received param
+  console.log('[ServiceProvidedScreen] Received service param:', service);
   if (!service || !service.id) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#23272F' }}>
@@ -54,11 +59,21 @@ export default function ServiceProvidedScreen() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetchProviderServicesByCategory(service.id)
-      .then(setProviderServices)
-      .catch(() => setError('Failed to load services'))
+    // Debug log for fetch
+    // Use the API for provider services, passing token if available
+    const token = user?.token || user?.access || user?.auth_token;
+    console.log('[ServiceProvidedScreen] Fetching provider services for category ID:', service.id, 'with token:', token);
+    fetchProviderServicesByCategory(service.id, token)
+      .then((data) => {
+        console.log('[ServiceProvidedScreen] Provider services fetched:', data);
+        setProviderServices(data);
+      })
+      .catch((err) => {
+        setError('Failed to load services');
+        console.log('[ServiceProvidedScreen] Error fetching provider services:', err);
+      })
       .finally(() => setLoading(false));
-  }, [service.id]);
+  }, [service.id, user]);
 
   return (
     <View style={styles.container}>

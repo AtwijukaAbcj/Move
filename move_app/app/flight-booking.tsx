@@ -1,2 +1,1 @@
-import FlightBookingScreen from '../screens/FlightBookingScreen';
-export default FlightBookingScreen;
+export { default } from "../screens/FlightBookingScreen";

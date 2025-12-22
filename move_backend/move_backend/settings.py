@@ -7,8 +7,8 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
-# Use custom Driver model as the user model
-AUTH_USER_MODEL = 'corporate.Driver'
+# Use custom Customer model as the user model
+AUTH_USER_MODEL = 'corporate.Customer'
 # Email settings for OTP and notifications
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'mail.solichsystems.com'

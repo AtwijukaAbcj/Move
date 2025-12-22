@@ -1,2 +1,1 @@
-import ServiceProvidedScreen from '../screens/ServiceProvidedScreen';
-export default ServiceProvidedScreen;
+export { default } from "../screens/ServiceProvidedScreen";

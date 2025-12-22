@@ -1,3 +1,68 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from .models import Customer
+from .serializers import CustomerRegistrationSerializer, CustomerLoginSerializer, CustomerGoogleAuthSerializer
+# Google registration/login endpoint
+class CustomerGoogleAuthAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from rest_framework.authtoken.models import Token
+        serializer = CustomerGoogleAuthSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        email = serializer.validated_data['email']
+        full_name = serializer.validated_data['full_name']
+        google_id = serializer.validated_data['google_id']
+        customer, created = Customer.objects.get_or_create(email=email, defaults={
+            'full_name': full_name,
+            'is_active': True,
+        })
+        # Optionally, store google_id in a profile field or log for audit
+        if not created:
+            # Update name if changed
+            if customer.full_name != full_name:
+                customer.full_name = full_name
+                customer.save()
+        # Get or create token
+        token, _ = Token.objects.get_or_create(user=customer)
+        return Response({'id': customer.id, 'email': customer.email, 'full_name': customer.full_name, 'token': token.key})
+# Customer registration endpoint
+from rest_framework.permissions import AllowAny
+
+class CustomerRegisterAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from rest_framework.authtoken.models import Token
+        serializer = CustomerRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            customer = serializer.save()
+            # Get or create token for the new customer
+            token, _ = Token.objects.get_or_create(user=customer)
+            return Response({'id': customer.id, 'email': customer.email, 'full_name': customer.full_name, 'token': token.key}, status=201)
+        return Response(serializer.errors, status=400)
+
+# Customer login endpoint
+class CustomerLoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from rest_framework.authtoken.models import Token
+        serializer = CustomerLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+        customer = Customer.objects.filter(email=email).first()
+        if not customer or not customer.check_password(password):
+            return Response({'error': 'Invalid credentials'}, status=401)
+        if not customer.is_active:
+            return Response({'error': 'Account is inactive. Contact support.'}, status=403)
+        # Get or create token
+        token, _ = Token.objects.get_or_create(user=customer)
+        return Response({'id': customer.id, 'email': customer.email, 'full_name': customer.full_name, 'token': token.key})
 
 from rest_framework.permissions import AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
