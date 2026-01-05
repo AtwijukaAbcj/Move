@@ -39,8 +39,22 @@ export default function OtpVerificationScreen({ route, navigation }) {
   };
 
   const onResend = async () => {
-    Alert.alert("OTP sent", `A new code was sent to ${phone || "your phone"}.`);
-    // TODO: Call resend OTP API
+    try {
+      const res = await fetch("http://192.168.1.31:8000/api/corporate/driver/resend-otp/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(useEmail ? { email } : { phone }),
+        }),
+      });
+      if (res.ok) {
+        Alert.alert("OTP sent", `A new code was sent to ${useEmail ? email : phone}.`);
+      } else {
+        Alert.alert("Error", "Failed to resend OTP. Please try again.");
+      }
+    } catch (e) {
+      Alert.alert("Error", "Failed to resend OTP. Please try again.");
+    }
   };
 
   return (

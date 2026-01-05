@@ -191,3 +191,46 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.username
+
+class Booking(models.Model):
+    RIDE_TYPE_CHOICES = [
+        ('standard', 'MOVE Standard'),
+        ('xl', 'MOVE XL'),
+        ('premium', 'MOVE Premium'),
+    ]
+    
+    PAYMENT_METHOD_CHOICES = [
+        ('card', 'Credit/Debit Card'),
+        ('mobilemoney', 'Mobile Money'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('driver_assigned', 'Driver Assigned'),
+        ('picked_up', 'Picked Up'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='bookings', null=True, blank=True)
+    driver = models.ForeignKey(Driver, on_delete=models.SET_NULL, related_name='bookings', null=True, blank=True)
+    
+    pickup_location = models.CharField(max_length=500)
+    destination = models.CharField(max_length=500)
+    ride_type = models.CharField(max_length=20, choices=RIDE_TYPE_CHOICES)
+    
+    fare = models.DecimalField(max_digits=10, decimal_places=2)
+    distance = models.DecimalField(max_digits=10, decimal_places=2, help_text='Distance in kilometers')
+    duration = models.IntegerField(help_text='Duration in minutes')
+    
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    payment_completed = models.BooleanField(default=False)
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Booking #{self.id} - {self.customer} - {self.status}"

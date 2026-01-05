@@ -61,3 +61,20 @@ class AdvertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Advert
         fields = ['id', 'image', 'caption', 'is_active', 'created_at']
+
+from .models import Booking
+
+class BookingSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.full_name', read_only=True)
+    driver_name = serializers.CharField(source='driver.full_name', read_only=True)
+    
+    class Meta:
+        model = Booking
+        fields = [
+            'id', 'customer', 'customer_name', 'driver', 'driver_name',
+            'pickup_location', 'destination', 'ride_type',
+            'fare', 'distance', 'duration',
+            'payment_method', 'payment_completed', 'status',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'customer_name', 'driver_name']

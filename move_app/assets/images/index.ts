@@ -1,7 +1,12 @@
 import logo from "./logo.png";
-import uberX from "./uberX.webp";
+import moveStandard from "./uberX.webp";
 import snacks from "./snacks.png";
-import uberXL from "./cars/uberX.webp";
-import uberLux from "./cars/uberLux.webp";
+import moveXL from "./cars/uberX.webp";
+import movePremium from "./cars/uberLux.webp";
 
-export { logo, uberX, snacks, uberXL, uberLux };
+// Legacy aliases for backward compatibility
+export const uberX = moveStandard;
+export const uberXL = moveXL;
+export const uberLux = movePremium;
+
+export { logo, moveStandard, snacks, moveXL, movePremium };

@@ -1,8 +1,8 @@
 import { configureStore } from "@reduxjs/toolkit";
-import uberReducer from "./uberSlices";
+import moveReducer from "./moveSlices";
 
 export const store = configureStore({
   reducer: {
-    uber: uberReducer,
+    move: moveReducer,
   },
 });

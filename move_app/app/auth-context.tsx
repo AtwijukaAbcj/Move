@@ -1,3 +1,4 @@
+// app/auth-context.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const storedUser = await SecureStore.getItemAsync("user");
         const storedToken = await SecureStore.getItemAsync("token");
+
         if (storedUser) setUser(JSON.parse(storedUser));
         if (storedToken) setToken(storedToken);
       } finally {
@@ -38,15 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (payload: any) => {
-    // token may be in payload.token/access/key
     const t =
       payload?.token ||
       payload?.access ||
       payload?.key ||
       payload?.auth_token ||
+      payload?.data?.token ||
+      payload?.data?.access ||
       null;
 
-    // user may be nested in payload.user
     const u = payload?.user || payload;
 
     setUser(u);
@@ -64,7 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await SecureStore.deleteItemAsync("token");
   };
 
-  const value = useMemo(() => ({ user, token, loading, login, logout }), [user, token, loading]);
+  const value = useMemo(
+    () => ({ user, token, loading, login, logout }),
+    [user, token, loading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

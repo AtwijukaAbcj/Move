@@ -5,7 +5,7 @@ import tw from "twrnc";
 import { Link } from "expo-router";
 import { TabBarIcon } from "./navigation/TabBarIcon";
 import { useSelector } from "react-redux";
-import { selectOrigin } from "@/store/uberSlices";
+import { selectOrigin } from "@/store/moveSlices";
 
 const NavOptions = () => {
   const origin = useSelector(selectOrigin);

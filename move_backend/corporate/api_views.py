@@ -247,6 +247,7 @@ from rest_framework import status
 class AdvertListCreateAPIView(generics.ListCreateAPIView):
     queryset = Advert.objects.filter(is_active=True).order_by('-created_at')
     serializer_class = AdvertSerializer
+    permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
         # If request.data is a list, handle bulk create
@@ -256,3 +257,269 @@ class AdvertListCreateAPIView(generics.ListCreateAPIView):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+# Driver set online/offline status
+class DriverSetOnlineAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def patch(self, request, driver_id):
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        is_online = request.data.get('is_online')
+        if is_online is not None:
+            driver.is_online = is_online
+            driver.save()
+            return Response({'is_online': driver.is_online, 'message': 'Status updated successfully'})
+        return Response({'error': 'is_online field required'}, status=400)
+
+
+# Mock ride requests (to be replaced with actual ride matching logic)
+class DriverRideRequestsAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, driver_id):
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        # For now, return empty list - this should integrate with ride request model
+        # When you have a Ride/RideRequest model, query pending requests here
+        return Response([])
+
+
+# Driver resend OTP
+class DriverResendOtpAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        phone = request.data.get('phone')
+        email = request.data.get('email')
+        
+        driver = None
+        if phone:
+            driver = Driver.objects.filter(phone=phone).first()
+        elif email:
+            driver = Driver.objects.filter(email=email).first()
+        
+        if not driver:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        # Generate new OTP
+        otp_code = str(random.randint(100000, 999999))
+        driver.otp_code = otp_code
+        driver.save()
+        
+        # Send OTP
+        if email and driver.email:
+            from django.conf import settings
+            try:
+                send_mail(
+                    'Your OTP Code',
+                    f'Your OTP is {otp_code}',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [driver.email],
+                    fail_silently=False
+                )
+            except Exception as e:
+                print(f"Failed to send OTP email: {e}")
+        
+        if phone and driver.phone:
+            print(f"[DEBUG] Would send OTP {otp_code} to phone {driver.phone}")
+        
+        return Response({'message': 'OTP sent successfully'})
+
+
+# Driver profile view and update
+class DriverProfileAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, driver_id):
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        return Response({
+            'id': driver.id,
+            'full_name': driver.full_name,
+            'phone': driver.phone,
+            'email': driver.email,
+            'vehicle_type': driver.vehicle_type,
+            'is_approved': driver.is_approved,
+            'is_online': driver.is_online,
+            'date_joined': driver.date_joined,
+        })
+
+    def patch(self, request, driver_id):
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        # Update allowed fields
+        if 'full_name' in request.data:
+            driver.full_name = request.data['full_name']
+        if 'vehicle_type' in request.data:
+            driver.vehicle_type = request.data['vehicle_type']
+        if 'phone' in request.data:
+            driver.phone = request.data['phone']
+        if 'email' in request.data:
+            driver.email = request.data['email']
+        
+        driver.save()
+        return Response({'message': 'Profile updated successfully'})
+
+
+# Driver earnings (mock data for now)
+class DriverEarningsAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, driver_id):
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        # Mock earnings data - replace with actual trip/earnings model
+        return Response({
+            'today': 0,
+            'this_week': 0,
+            'this_month': 0,
+            'total': 0,
+            'currency': 'USD'
+        })
+
+
+# Driver trip history (mock data for now)
+class DriverTripHistoryAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, driver_id):
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        # Mock trip history - replace with actual trip model
+        return Response([])
+
+
+# Driver wallet (mock data for now)
+class DriverWalletAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, driver_id):
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        # Mock wallet data - replace with actual wallet/transaction model
+        return Response({
+            'balance': 0,
+            'pending': 0,
+            'currency': 'USD',
+            'transactions': []
+        })
+
+
+# Driver accept ride request (mock - to be implemented with ride model)
+class DriverAcceptRideAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, driver_id):
+        ride_request_id = request.data.get('ride_request_id')
+        
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        if not ride_request_id:
+            return Response({'error': 'ride_request_id required'}, status=400)
+        
+        # TODO: Implement with actual Ride model
+        # ride = RideRequest.objects.get(id=ride_request_id)
+        # ride.driver = driver
+        # ride.status = 'accepted'
+        # ride.save()
+        
+        return Response({'message': 'Ride accepted successfully', 'status': 'accepted'})
+
+
+# Driver reject ride request (mock - to be implemented with ride model)
+class DriverRejectRideAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, driver_id):
+        ride_request_id = request.data.get('ride_request_id')
+        
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            return Response({'error': 'Driver not found'}, status=404)
+        
+        if not ride_request_id:
+            return Response({'error': 'ride_request_id required'}, status=400)
+        
+        # TODO: Implement with actual Ride model
+        # ride = RideRequest.objects.get(id=ride_request_id)
+        # ride.rejected_by.add(driver)
+        # ride.save()
+        
+        return Response({'message': 'Ride rejected', 'status': 'rejected'})
+
+# Booking endpoints
+from rest_framework import generics, status
+from .models import Booking
+from .serializers import BookingSerializer
+
+class BookingListCreateAPIView(generics.ListCreateAPIView):
+    """
+    List all bookings or create a new booking
+    """
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
+    permission_classes = [AllowAny]
+    
+    def perform_create(self, serializer):
+        # Optionally set customer from authenticated user
+        # if self.request.user.is_authenticated:
+        #     serializer.save(customer=self.request.user)
+        # else:
+        serializer.save()
+
+class BookingDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update or delete a booking
+    """
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
+    permission_classes = [AllowAny]
+
+class CustomerBookingsAPIView(generics.ListAPIView):
+    """
+    List all bookings for a specific customer
+    """
+    serializer_class = BookingSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        customer_id = self.kwargs.get('customer_id')
+        return Booking.objects.filter(customer_id=customer_id).order_by('-created_at')
+
+class DriverBookingsAPIView(generics.ListAPIView):
+    """
+    List all bookings for a specific driver
+    """
+    serializer_class = BookingSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        driver_id = self.kwargs.get('driver_id')
+        return Booking.objects.filter(driver_id=driver_id).order_by('-created_at')

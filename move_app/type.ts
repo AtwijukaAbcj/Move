@@ -1,5 +1,5 @@
-export interface UberState {
-  uber: {
+export interface MoveState {
+  move: {
     origin: {
       location: {
         lat: number;

@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Entypo } from '@expo/vector-icons';
 import { fetchProviderServicesByCategory } from '../api/providerServices';
 import { useAuth } from '../app/auth-context';
@@ -76,7 +77,7 @@ export default function ServiceProvidedScreen() {
   }, [service.id, user]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Custom content for each service type (colored card) */}
       {service.service_type === 'flight_booking' && (
         <View style={[styles.customInfoBox, { backgroundColor: '#35736E' }]}> 
@@ -161,7 +162,7 @@ export default function ServiceProvidedScreen() {
         )}
         contentContainerStyle={{ paddingBottom: 24 }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

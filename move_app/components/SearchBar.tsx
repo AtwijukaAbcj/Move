@@ -4,7 +4,7 @@ import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplet
 import { GOOGLE_API_KEY } from "@/config";
 import { StyleSheet } from "react-native";
 import { useDispatch } from "react-redux";
-import { setDestination, setOrigin } from "@/store/uberSlices";
+import { setDestination, setOrigin } from "@/store/moveSlices";
 
 const SearchBar = () => {
   const dispatch = useDispatch();

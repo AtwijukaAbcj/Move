@@ -41,7 +41,7 @@ export default function LoginScreen() {
 
       if (res.ok && (data?.id || token)) {
         await login(data);          // store full user payload (incl token if present)
-        router.replace("/");
+        router.replace("/(tabs)/home");
         return;
       }
 

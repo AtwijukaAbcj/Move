@@ -6,7 +6,7 @@ import {
   selectDestination,
   selectOrigin,
   setTravelTimeInformation,
-} from "@/store/uberSlices";
+} from "@/store/moveSlices";
 import MapViewDirections from "react-native-maps-directions";
 import { GOOGLE_API_KEY } from "@/config";
 

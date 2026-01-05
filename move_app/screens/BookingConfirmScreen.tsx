@@ -1,0 +1,338 @@
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import MapView, { Marker, Polyline } from "react-native-maps";
+
+const THEME = {
+  primary: "#35736E",
+  aqua: "#5EC6C6",
+  accent: "#FFA726",
+  dark: "#23272F",
+  ink: "#0f1a19",
+};
+
+export default function BookingConfirmScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  
+  const pickup = params.pickup as string || "Pick up location";
+  const destination = params.destination as string || "Destination";
+  const rideType = params.selectedRide as string || "standard";
+  
+  const [estimatedFare, setEstimatedFare] = useState(0);
+  const [distance, setDistance] = useState("0");
+  const [duration, setDuration] = useState("0");
+
+  useEffect(() => {
+    // Calculate estimated fare based on ride type
+    const baseFares = { standard: 15, xl: 25, premium: 35 };
+    const fare = baseFares[rideType as keyof typeof baseFares] || 15;
+    setEstimatedFare(fare + Math.random() * 10); // Add random amount for variation
+    
+    // Mock distance and duration
+    setDistance((3 + Math.random() * 7).toFixed(1));
+    setDuration((10 + Math.random() * 20).toFixed(0));
+  }, [rideType]);
+
+  const getRideInfo = () => {
+    const rides = {
+      standard: { title: "MOVE Standard", icon: "car-sport", color: "#5EC6C6" },
+      xl: { title: "MOVE XL", icon: "car", color: "#FFA726" },
+      premium: { title: "MOVE Premium", icon: "car-sport", color: "#9B59B6" },
+    };
+    return rides[rideType as keyof typeof rides] || rides.standard;
+  };
+
+  const rideInfo = getRideInfo();
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.9}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Confirm Your Ride</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Mini Map */}
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            initialRegion={{
+              latitude: 6.5244,
+              longitude: 3.3792,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            scrollEnabled={false}
+            zoomEnabled={false}
+          >
+            <Marker coordinate={{ latitude: 6.5244, longitude: 3.3792 }} pinColor="#5EC6C6" />
+            <Marker coordinate={{ latitude: 6.5344, longitude: 3.3892 }} pinColor="#FFA726" />
+            <Polyline
+              coordinates={[
+                { latitude: 6.5244, longitude: 3.3792 },
+                { latitude: 6.5344, longitude: 3.3892 },
+              ]}
+              strokeColor={THEME.aqua}
+              strokeWidth={3}
+            />
+          </MapView>
+        </View>
+
+        {/* Route Details */}
+        <View style={styles.card}>
+          <View style={styles.routeRow}>
+            <View style={styles.routeDot} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.routeLabel}>Pickup</Text>
+              <Text style={styles.routeValue}>{pickup}</Text>
+            </View>
+          </View>
+
+          <View style={styles.routeLine} />
+
+          <View style={styles.routeRow}>
+            <View style={[styles.routeDot, { backgroundColor: THEME.accent }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.routeLabel}>Destination</Text>
+              <Text style={styles.routeValue}>{destination}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Ride Info */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Selected Ride</Text>
+          <View style={styles.rideInfoRow}>
+            <View style={[styles.rideIconBox, { backgroundColor: `${rideInfo.color}20` }]}>
+              <Ionicons name={rideInfo.icon as any} size={24} color={rideInfo.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rideTitle}>{rideInfo.title}</Text>
+              <View style={styles.rideMetaRow}>
+                <Ionicons name="time-outline" size={14} color="#9AA4B2" />
+                <Text style={styles.rideMeta}>{duration} min</Text>
+                <Ionicons name="navigate-outline" size={14} color="#9AA4B2" style={{ marginLeft: 12 }} />
+                <Text style={styles.rideMeta}>{distance} km</Text>
+              </View>
+            </View>
+            <View style={styles.priceBox}>
+              <Text style={styles.currency}>$</Text>
+              <Text style={styles.priceValue}>{estimatedFare.toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Price Breakdown */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Price Breakdown</Text>
+          
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Base fare</Text>
+            <Text style={styles.breakdownValue}>${(estimatedFare * 0.6).toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Distance ({distance} km)</Text>
+            <Text style={styles.breakdownValue}>${(estimatedFare * 0.3).toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Service fee</Text>
+            <Text style={styles.breakdownValue}>${(estimatedFare * 0.1).toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>${estimatedFare.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Payment Method Prompt */}
+        <View style={styles.card}>
+          <View style={styles.paymentPromptRow}>
+            <Ionicons name="card-outline" size={24} color={THEME.aqua} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.paymentPromptTitle}>Payment Method</Text>
+              <Text style={styles.paymentPromptSub}>Select your payment method</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9AA4B2" />
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Bottom Actions */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          activeOpacity={0.9}
+          onPress={() => router.push({
+            pathname: "/payment-method",
+            params: { 
+              pickup, 
+              destination, 
+              rideType, 
+              fare: estimatedFare.toFixed(2),
+              distance,
+              duration 
+            }
+          })}
+        >
+          <Text style={styles.primaryBtnText}>Continue to Payment</Text>
+          <Ionicons name="arrow-forward" size={20} color={THEME.ink} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: THEME.dark },
+  
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 56 : 16,
+    paddingBottom: 16,
+    backgroundColor: THEME.dark,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "900" },
+
+  content: { flex: 1 },
+
+  mapContainer: {
+    height: 200,
+    margin: 16,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  map: { flex: 1 },
+
+  card: {
+    backgroundColor: "#2D313A",
+    borderRadius: 18,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  cardTitle: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    marginBottom: 12,
+    textTransform: "uppercase",
+  },
+
+  routeRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  routeDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: THEME.aqua,
+    marginTop: 4,
+  },
+  routeLabel: { color: "#9AA4B2", fontSize: 12, fontWeight: "700", marginBottom: 4 },
+  routeValue: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  routeLine: {
+    width: 2,
+    height: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    marginLeft: 5,
+    marginVertical: 6,
+  },
+
+  rideInfoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  rideIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rideTitle: { color: "#fff", fontSize: 16, fontWeight: "900", marginBottom: 4 },
+  rideMetaRow: { flexDirection: "row", alignItems: "center" },
+  rideMeta: { color: "#9AA4B2", fontSize: 12, fontWeight: "700", marginLeft: 4 },
+  priceBox: { alignItems: "flex-end" },
+  currency: { color: THEME.aqua, fontSize: 14, fontWeight: "800" },
+  priceValue: { color: THEME.aqua, fontSize: 24, fontWeight: "900" },
+
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  breakdownLabel: { color: "#9AA4B2", fontSize: 14, fontWeight: "700" },
+  breakdownValue: { color: "#fff", fontSize: 14, fontWeight: "800" },
+
+  divider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginVertical: 12,
+  },
+
+  totalRow: { flexDirection: "row", justifyContent: "space-between" },
+  totalLabel: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  totalValue: { color: THEME.aqua, fontSize: 20, fontWeight: "900" },
+
+  paymentPromptRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paymentPromptTitle: { color: "#fff", fontSize: 15, fontWeight: "800", marginBottom: 2 },
+  paymentPromptSub: { color: "#9AA4B2", fontSize: 13, fontWeight: "700" },
+
+  footer: {
+    padding: 16,
+    paddingBottom: Platform.OS === "ios" ? 32 : 16,
+    backgroundColor: THEME.dark,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+  primaryBtn: {
+    backgroundColor: THEME.aqua,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  primaryBtnText: { color: THEME.ink, fontSize: 16, fontWeight: "900" },
+});

@@ -6,7 +6,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import LoginScreen from "./screens/LoginScreen";
 import DriverRegistrationScreen from "./screens/DriverRegistrationScreen";
 import OtpVerificationScreen from "./screens/OtpVerificationScreen";
-import DashboardScreen from "./screens/DashboardScreen";
+import DriverTabs from "./navigation/DriverTabs";
 import DocumentUploadScreen from "./screens/DocumentUploadScreen";
 
 export type RootStackParamList = {
@@ -40,8 +40,8 @@ export default function App() {
         />
         <Stack.Screen
           name="Dashboard"
-          component={DashboardScreen}
-          options={{ title: "Dashboard" }}
+          component={DriverTabs}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="DocumentUpload"

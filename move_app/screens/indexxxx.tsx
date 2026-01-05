@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+// This file has been renamed to HomeScreen.tsx. Please update your imports to use './HomeScreen'.
+import React, { useEffect, useMemo, useState } from "react";
+import {
 import {
   Image,
   View,

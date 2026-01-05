@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { getToken } from "../utils/storage";
@@ -38,10 +39,10 @@ export default function DocumentUploadScreen({ navigation }) {
     car_image_2: null,
     inspection_report: null,
   });
-
   const [uploading, setUploading] = useState(false);
   const [userId, setUserId] = useState("");
   const [tokenLoading, setTokenLoading] = useState(true);
+  const [submitted, setSubmitted] = useState(false); // <-- NEW
 
   // Load userId ONCE when screen mounts
   useEffect(() => {
@@ -143,7 +144,8 @@ export default function DocumentUploadScreen({ navigation }) {
         }
       }
       Alert.alert("Success", "Documents uploaded successfully!");
-      navigation.replace("Dashboard");
+      setSubmitted(true); // <-- NEW
+      // navigation.replace("Dashboard"); // Don't navigate away
     } catch (e) {
       Alert.alert("Upload failed", "Network/server error. Please try again.");
     } finally {
@@ -154,52 +156,44 @@ export default function DocumentUploadScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Upload Verification Documents</Text>
-
       <View style={styles.card}>
-        <Text style={styles.help}>Please upload all required documents for verification:</Text>
-
-        <DocPicker
-          label="Driver's License"
-          value={docs.drivers_license}
-          onPick={() => pickDocument("drivers_license")}
-        />
-        <DocPicker
-          label="Car Ownership"
-          value={docs.car_ownership}
-          onPick={() => pickDocument("car_ownership")}
-        />
-        <DocPicker
-          label="Car Image 1"
-          value={docs.car_image_1}
-          onPick={() => pickDocument("car_image_1", "image/*")}
-        />
-        <DocPicker
-          label="Car Image 2"
-          value={docs.car_image_2}
-          onPick={() => pickDocument("car_image_2", "image/*")}
-        />
-        <DocPicker
-          label="Inspection Report"
-          value={docs.inspection_report}
-          onPick={() => pickDocument("inspection_report")}
-        />
-
-        <TouchableOpacity
-          style={[styles.uploadBtn, (uploading || tokenLoading) ? styles.buttonDisabled : null]}
-          onPress={uploadAll}
-          disabled={uploading || tokenLoading}
-          activeOpacity={0.85}
-        >
-          {uploading || tokenLoading ? (
-            <ActivityIndicator />
-          ) : (
-            <Text style={styles.uploadText}>Upload All</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.skip} onPress={() => navigation.replace("Dashboard")} activeOpacity={0.85}>
-          <Text style={styles.skipText}>Skip for now</Text>
-        </TouchableOpacity>
+        {submitted ? (
+          <>
+            <Text style={[styles.help, { color: '#FFA726', textAlign: 'center', fontWeight: 'bold' }]}>Your documents are under review. Please wait for admin approval.</Text>
+            <Text style={[styles.help, { color: '#b9c2d1', marginTop: 10 }]}>Submitted Documents:</Text>
+            {Object.entries(docs).map(([key, value]) => value && (
+              <View key={key} style={{ marginBottom: 10 }}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{key.replace(/_/g, ' ').toUpperCase()}</Text>
+                {value.mimeType && value.mimeType.startsWith('image') ? (
+                  <View style={{ borderWidth: 1, borderColor: '#24314d', borderRadius: 8, marginTop: 4 }}>
+                    <Image source={{ uri: value.uri }} style={{ width: 120, height: 80, borderRadius: 8 }} resizeMode="cover" />
+                  </View>
+                ) : (
+                  <Text style={{ color: '#b9c2d1', fontSize: 13, marginTop: 4 }}>{value.name}</Text>
+                )}
+              </View>
+            ))}
+          </>
+        ) : (
+          <>
+            <Text style={styles.help}>Please upload all required documents for verification:</Text>
+            <DocPicker label="Driver's License" value={docs.drivers_license} onPick={() => pickDocument("drivers_license")} />
+            <DocPicker label="Car Ownership" value={docs.car_ownership} onPick={() => pickDocument("car_ownership")} />
+            <DocPicker label="Car Image 1" value={docs.car_image_1} onPick={() => pickDocument("car_image_1", "image/*")} />
+            <DocPicker label="Car Image 2" value={docs.car_image_2} onPick={() => pickDocument("car_image_2", "image/*")} />
+            <DocPicker label="Inspection Report" value={docs.inspection_report} onPick={() => pickDocument("inspection_report")} />
+            <TouchableOpacity style={[styles.uploadBtn, (uploading || tokenLoading) ? styles.buttonDisabled : null]} onPress={uploadAll} disabled={uploading || tokenLoading} activeOpacity={0.85}>
+              {uploading || tokenLoading ? (
+                <ActivityIndicator />
+              ) : (
+                <Text style={styles.uploadText}>Upload All</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.skip} onPress={() => navigation.replace("Dashboard")} activeOpacity={0.85}>
+              <Text style={styles.skipText}>Skip for now</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );

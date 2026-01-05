@@ -5,7 +5,7 @@ import { TabBarIcon } from "./navigation/TabBarIcon";
 import tw from "twrnc";
 import { FlatList } from "react-native";
 import { Image } from "react-native";
-import { selectTravelTimeInformation } from "@/store/uberSlices";
+import { selectTravelTimeInformation } from "@/store/moveSlices";
 import { useSelector } from "react-redux";
 import { useNavigation } from "expo-router";
 type RideOption = {
@@ -16,20 +16,20 @@ type RideOption = {
 };
 const data: RideOption[] = [
   {
-    _id: "Uber-X-123",
-    title: "UberX",
+    _id: "MOVE-Standard-123",
+    title: "MOVE Standard",
     multiplier: 1,
     image: uberX,
   },
   {
-    _id: "Uber-XL-456",
-    title: "Uber XL",
+    _id: "MOVE-XL-456",
+    title: "MOVE XL",
     multiplier: 1.2,
     image: uberXL,
   },
   {
-    _id: "Uber-LUX-789",
-    title: "Uber LUX",
+    _id: "MOVE-Premium-789",
+    title: "MOVE Premium",
     multiplier: 1.75,
     image: uberLux,
   },
