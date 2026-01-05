@@ -19,12 +19,21 @@ export default function DriverRegistrationScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [otpMethod, setOtpMethod] = useState("phone"); // "phone" or "email"
 
   const onRegister = async () => {
-    if (!fullName.trim() || !phone.trim() || !email.trim() || !password.trim()) {
+    // Phone is always required
+    if (!fullName.trim() || !phone.trim() || !password.trim()) {
       Alert.alert("Missing info", "Please fill in all required fields.");
       return;
     }
+    
+    // Email is required only if using email OTP
+    if (otpMethod === "email" && !email.trim()) {
+      Alert.alert("Missing info", "Please enter your email to receive OTP.");
+      return;
+    }
+    
     if (!acceptTerms) {
       Alert.alert("Terms required", "Please accept Terms & Privacy Policy.");
       return;
@@ -37,16 +46,16 @@ export default function DriverRegistrationScreen({ navigation }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: fullName,
-          phone,
-          email,
+          phone: phone.trim() || undefined,
+          email: email.trim() || undefined,
           vehicle_type: vehicleType,
           password,
-          otp_method: "phone", // or "email" if you add a toggle
+          otp_method: otpMethod,
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        navigation.navigate("OtpVerification", { phone, email });
+        navigation.navigate("OtpVerification", { phone, email, otpMethod });
       } else {
         Alert.alert("Registration failed", data.error || JSON.stringify(data));
       }
@@ -74,6 +83,29 @@ export default function DriverRegistrationScreen({ navigation }) {
           style={styles.input}
         />
 
+        {/* OTP Method Selector */}
+        <Text style={styles.label}>Receive OTP via *</Text>
+        <View style={styles.otpMethodContainer}>
+          <TouchableOpacity
+            style={[styles.otpMethodButton, otpMethod === "phone" && styles.otpMethodActive]}
+            onPress={() => setOtpMethod("phone")}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.otpMethodText, otpMethod === "phone" && styles.otpMethodTextActive]}>
+              📱 Phone
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.otpMethodButton, otpMethod === "email" && styles.otpMethodActive]}
+            onPress={() => setOtpMethod("email")}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.otpMethodText, otpMethod === "email" && styles.otpMethodTextActive]}>
+              📧 Email
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.label}>Phone Number *</Text>
         <TextInput
           value={phone}
@@ -83,7 +115,7 @@ export default function DriverRegistrationScreen({ navigation }) {
           style={styles.input}
         />
 
-        <Text style={styles.label}>Email *</Text>
+        <Text style={styles.label}>Email {otpMethod === "email" ? "*" : "(optional)"}</Text>
         <TextInput
           value={email}
           onChangeText={setEmail}
@@ -160,6 +192,31 @@ const styles = StyleSheet.create({
   },
   checkboxOn: { backgroundColor: "#2f66ff", borderColor: "#2f66ff" },
   checkboxText: { color: "#b9c2d1" },
+  otpMethodContainer: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  otpMethodButton: {
+    flex: 1,
+    backgroundColor: "#0f1627",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#24314d",
+  },
+  otpMethodActive: {
+    backgroundColor: "#2f66ff",
+    borderColor: "#2f66ff",
+  },
+  otpMethodText: {
+    color: "#b9c2d1",
+    fontWeight: "600",
+  },
+  otpMethodTextActive: {
+    color: "#fff",
+  },
   button: {
     marginTop: 16,
     backgroundColor: "#2f66ff",

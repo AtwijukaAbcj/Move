@@ -6,9 +6,12 @@ import {
   ActivityIndicator,
   Platform,
   Animated,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { addNotification } from "../utils/notifications";
 
 const THEME = {
   primary: "#35736E",
@@ -44,7 +47,17 @@ export default function PaymentProcessScreen() {
 
   const processPaymentAndBooking = async () => {
     try {
+      // Get customer ID from AsyncStorage
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) {
+        setStatus("failed");
+        Alert.alert("Error", "Please login again");
+        router.replace("/login");
+        return;
+      }
+
       const bookingData = {
+        customer: parseInt(customerId),
         pickup_location: params.pickup,
         destination: params.destination,
         ride_type: params.rideType,
@@ -53,9 +66,12 @@ export default function PaymentProcessScreen() {
         duration: parseInt(params.duration as string),
         payment_method: params.paymentMethod,
         status: "pending",
+        contact_phone: params.contactPhone as string || "",
       };
 
-      const response = await fetch("http://192.168.1.31:8000/api/bookings/", {
+      console.log("Creating booking with data:", bookingData);
+
+      const response = await fetch("http://192.168.1.31:8000/api/corporate/bookings/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -63,9 +79,27 @@ export default function PaymentProcessScreen() {
         body: JSON.stringify(bookingData),
       });
 
+      const responseData = await response.json();
+      console.log("Booking response:", responseData);
+
       if (response.ok) {
-        const booking = await response.json();
+        const booking = responseData;
         setStatus("success");
+        
+        // Add notification for successful booking
+        if (customerId) {
+          await addNotification(
+            customerId,
+            'Ride Booked Successfully! 🚗',
+            `Your ${params.rideType || 'ride'} from ${params.pickup} to ${params.destination} has been confirmed. Fare: $${params.fare}`,
+            'ride',
+            { bookingId: booking.id, rideType: params.rideType }
+          );
+        }
+        
+        // Track order history and last visited
+        await trackOrderHistory(params.destination as string);
+        await trackLastVisited(params.destination as string);
         
         // Navigate to success screen after a brief delay
         setTimeout(() => {
@@ -78,11 +112,57 @@ export default function PaymentProcessScreen() {
           });
         }, 1500);
       } else {
+        console.error("Booking failed:", responseData);
         setStatus("failed");
+        Alert.alert("Booking Failed", responseData.error || responseData.detail || "Could not create booking. Please try again.");
       }
     } catch (error) {
-      console.error("Payment processing error:", error);
+      console.error("Error creating booking:", error);
       setStatus("failed");
+      Alert.alert("Error", "Network error. Please check your connection and try again.");
+    }
+  };
+
+  const trackOrderHistory = async (destination: string) => {
+    try {
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) return;
+      
+      const orderHistoryStr = await AsyncStorage.getItem(`ORDER_HISTORY_${customerId}`);
+      let orderHistory: Record<string, number> = {};
+      
+      if (orderHistoryStr) {
+        orderHistory = JSON.parse(orderHistoryStr);
+      }
+      
+      // Increment count for this destination
+      if (orderHistory[destination]) {
+        orderHistory[destination]++;
+      } else {
+        orderHistory[destination] = 1;
+      }
+      
+      await AsyncStorage.setItem(`ORDER_HISTORY_${customerId}`, JSON.stringify(orderHistory));
+      console.log("Order history updated:", orderHistory);
+    } catch (error) {
+      console.error("Error tracking order history:", error);
+    }
+  };
+
+  const trackLastVisited = async (destination: string) => {
+    try {
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) return;
+      
+      const lastVisitedData = {
+        destination,
+        timestamp: new Date().toISOString(),
+      };
+      
+      await AsyncStorage.setItem(`LAST_VISITED_PLACE_${customerId}`, JSON.stringify(lastVisitedData));
+      console.log("Last visited place updated:", lastVisitedData);
+    } catch (error) {
+      console.error("Error tracking last visited:", error);
     }
   };
 

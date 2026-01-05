@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,17 +9,20 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Modal,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from "../app/auth-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const GOOGLE_MAPS_API_KEY = "AIzaSyAEIJNjKs7Kxr5DstLl_Slzp5oCk8Ba2l0";
 
 export default function RidesScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   if (!user) {
     router.replace("/login");
@@ -28,7 +31,21 @@ export default function RidesScreen() {
 
   const [pickup, setPickup] = useState("");
   const [destination, setDestination] = useState("");
+  const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<any[]>([]);
+  const [activeInput, setActiveInput] = useState<"pickup" | "destination" | null>(null);
+
+  useEffect(() => {
+    if (params.destination) {
+      setDestination(params.destination as string);
+    }
+  }, [params.destination]);
   const [selectedRide, setSelectedRide] = useState<"standard" | "xl" | "premium">("standard");
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState(new Date());
+  const [scheduledTime, setScheduledTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [region, setRegion] = useState({
     latitude: 6.5244,
@@ -48,6 +65,59 @@ export default function RidesScreen() {
 
   const canRequest = pickup.trim().length > 0 && destination.trim().length > 0;
 
+  const searchPlaces = async (query: string, type: "pickup" | "destination") => {
+    if (!query || query.length < 3) {
+      if (type === "pickup") {
+        setPickupSuggestions([]);
+      } else {
+        setDestinationSuggestions([]);
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+          query
+        )}&key=${GOOGLE_MAPS_API_KEY}&components=country:ug`
+      );
+      const data = await response.json();
+      
+      if (data.predictions) {
+        if (type === "pickup") {
+          setPickupSuggestions(data.predictions);
+        } else {
+          setDestinationSuggestions(data.predictions);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching places:", error);
+    }
+  };
+
+  const selectSuggestion = (suggestion: any, type: "pickup" | "destination") => {
+    if (type === "pickup") {
+      setPickup(suggestion.description);
+      setPickupSuggestions([]);
+    } else {
+      setDestination(suggestion.description);
+      setDestinationSuggestions([]);
+    }
+    setActiveInput(null);
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (activeInput === "pickup") {
+        searchPlaces(pickup, "pickup");
+      } else if (activeInput === "destination") {
+        searchPlaces(destination, "destination");
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [pickup, destination, activeInput]);
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={styles.container}>
@@ -58,8 +128,12 @@ export default function RidesScreen() {
 
         {/* TOP FLOATING HEADER */}
         <View style={styles.topHeader}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.circleBtn} activeOpacity={0.9}>
-            <Ionicons name="chevron-back" size={22} color="#0f1a19" />
+          <TouchableOpacity 
+            onPress={() => router.push("/account")} 
+            style={styles.circleBtn} 
+            activeOpacity={0.9}
+          >
+            <Ionicons name="person-circle-outline" size={22} color="#0f1a19" />
           </TouchableOpacity>
 
           <View style={styles.headerPill}>
@@ -67,8 +141,12 @@ export default function RidesScreen() {
             <Text style={styles.headerTitle}>Request a ride</Text>
           </View>
 
-          <TouchableOpacity style={styles.circleBtn} activeOpacity={0.9}>
-            <Ionicons name="shield-checkmark-outline" size={20} color="#0f1a19" />
+          <TouchableOpacity 
+            style={styles.circleBtn} 
+            activeOpacity={0.9}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={22} color="#0f1a19" />
           </TouchableOpacity>
         </View>
 
@@ -87,9 +165,16 @@ export default function RidesScreen() {
                 placeholder="Pickup location"
                 placeholderTextColor="#9AA4B2"
                 value={pickup}
-                onChangeText={setPickup}
+                onChangeText={(text) => {
+                  setPickup(text);
+                  setActiveInput("pickup");
+                }}
+                onFocus={() => setActiveInput("pickup")}
               />
-              <Pressable onPress={() => setPickup("")} style={styles.clearBtn}>
+              <Pressable onPress={() => {
+                setPickup("");
+                setPickupSuggestions([]);
+              }} style={styles.clearBtn}>
                 <Ionicons name="close" size={16} color="#9AA4B2" />
               </Pressable>
             </View>
@@ -105,14 +190,73 @@ export default function RidesScreen() {
                 placeholder="Where to?"
                 placeholderTextColor="#9AA4B2"
                 value={destination}
-                onChangeText={setDestination}
+                onChangeText={(text) => {
+                  setDestination(text);
+                  setActiveInput("destination");
+                }}
+                onFocus={() => setActiveInput("destination")}
               />
-              <Pressable onPress={() => setDestination("")} style={styles.clearBtn}>
+              <Pressable onPress={() => {
+                setDestination("");
+                setDestinationSuggestions([]);
+              }} style={styles.clearBtn}>
                 <Ionicons name="close" size={16} color="#9AA4B2" />
               </Pressable>
             </View>
           </View>
 
+          {/* Pickup Suggestions */}
+          {activeInput === "pickup" && pickupSuggestions.length > 0 && (
+            <ScrollView style={styles.suggestionsContainer} keyboardShouldPersistTaps="handled">
+              {pickupSuggestions.map((suggestion) => (
+                <TouchableOpacity
+                  key={suggestion.place_id}
+                  style={styles.suggestionItem}
+                  onPress={() => selectSuggestion(suggestion, "pickup")}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.suggestionIcon}>
+                    <Ionicons name="location-outline" size={18} color="#5EC6C6" />
+                  </View>
+                  <View style={styles.suggestionText}>
+                    <Text style={styles.suggestionMainText} numberOfLines={1}>
+                      {suggestion.structured_formatting?.main_text || suggestion.description}
+                    </Text>
+                    <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
+                      {suggestion.structured_formatting?.secondary_text || ""}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Destination Suggestions */}
+          {activeInput === "destination" && destinationSuggestions.length > 0 && (
+            <ScrollView style={styles.suggestionsContainer} keyboardShouldPersistTaps="handled">
+              {destinationSuggestions.map((suggestion) => (
+                <TouchableOpacity
+                  key={suggestion.place_id}
+                  style={styles.suggestionItem}
+                  onPress={() => selectSuggestion(suggestion, "destination")}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.suggestionIcon}>
+                    <Ionicons name="location-outline" size={18} color="#FFA726" />
+                  </View>
+                  <View style={styles.suggestionText}>
+                    <Text style={styles.suggestionMainText} numberOfLines={1}>
+                      {suggestion.structured_formatting?.main_text || suggestion.description}
+                    </Text>
+                    <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
+                      {suggestion.structured_formatting?.secondary_text || ""}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+          
           {/* Quick chips */}
           <View style={styles.chipsRow}>
             <TouchableOpacity style={styles.chip} activeOpacity={0.9}>
@@ -125,7 +269,11 @@ export default function RidesScreen() {
               <Text style={styles.chipText}>Work</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.chip} activeOpacity={0.9}>
+            <TouchableOpacity 
+              style={styles.chip} 
+              activeOpacity={0.9}
+              onPress={() => setShowScheduleModal(true)}
+            >
               <Ionicons name="time-outline" size={16} color="#35736E" />
               <Text style={styles.chipText}>Schedule</Text>
             </TouchableOpacity>
@@ -184,6 +332,108 @@ export default function RidesScreen() {
 
           <Text style={styles.helperText}>Tip: Add pickup & destination to enable request.</Text>
         </View>
+
+        {/* Schedule Modal */}
+        <Modal
+          visible={showScheduleModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowScheduleModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.scheduleModal}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Schedule a Ride</Text>
+                <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
+                  <Ionicons name="close" size={24} color="#0f1a19" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.scheduleContent}>
+                <Text style={styles.scheduleLabel}>Select Date</Text>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#35736E" />
+                  <Text style={styles.dateTimeText}>
+                    {scheduledDate.toLocaleDateString('en-US', { 
+                      weekday: 'short', 
+                      year: 'numeric', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    })}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.scheduleLabel, { marginTop: 16 }]}>Select Time</Text>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={20} color="#35736E" />
+                  <Text style={styles.dateTimeText}>
+                    {scheduledTime.toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </Text>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={scheduledDate}
+                    mode="date"
+                    minimumDate={new Date()}
+                    onChange={(event, date) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (date) setScheduledDate(date);
+                    }}
+                  />
+                )}
+
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={scheduledTime}
+                    mode="time"
+                    onChange={(event, time) => {
+                      setShowTimePicker(Platform.OS === 'ios');
+                      if (time) setScheduledTime(time);
+                    }}
+                  />
+                )}
+
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { marginTop: 24 }]}
+                  onPress={() => {
+                    const combinedDateTime = new Date(
+                      scheduledDate.getFullYear(),
+                      scheduledDate.getMonth(),
+                      scheduledDate.getDate(),
+                      scheduledTime.getHours(),
+                      scheduledTime.getMinutes()
+                    );
+                    setShowScheduleModal(false);
+                    router.push({
+                      pathname: "/booking-confirm",
+                      params: {
+                        pickup,
+                        destination,
+                        selectedRide,
+                        scheduled: "true",
+                        scheduledDateTime: combinedDateTime.toISOString(),
+                      }
+                    });
+                  }}
+                  disabled={!canRequest}
+                >
+                  <Text style={styles.primaryBtnText}>Schedule Ride</Text>
+                  <Ionicons name="checkmark" size={18} color="#0f1a19" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -393,5 +643,96 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
     fontWeight: "700",
     fontSize: 12,
+  },
+
+  /* Schedule Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  scheduleModal: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#0f1a19",
+  },
+  scheduleContent: {
+    padding: 20,
+  },
+  scheduleLabel: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#0f1a19",
+    marginBottom: 10,
+  },
+  dateTimeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(53,115,110,0.08)",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(53,115,110,0.15)",
+  },
+  dateTimeText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f1a19",
+  },
+
+  /* Suggestions */
+  suggestionsContainer: {
+    maxHeight: 220,
+    backgroundColor: "#2D313A",
+    borderRadius: 16,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  suggestionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestionText: {
+    flex: 1,
+  },
+  suggestionMainText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 2,
+  },
+  suggestionSecondaryText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

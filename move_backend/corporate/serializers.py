@@ -4,8 +4,10 @@ from rest_framework import serializers
 # Google Registration/Login Serializer
 class CustomerGoogleAuthSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    full_name = serializers.CharField()
+    name = serializers.CharField(required=False)  # Accept "name" from Google
+    full_name = serializers.CharField(required=False)  # Also accept "full_name"
     google_id = serializers.CharField()
+    picture = serializers.URLField(required=False)
 from .models import Customer, Driver
 class DriverDashboardSerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,6 +41,13 @@ class DriverRegistrationSerializer(serializers.ModelSerializer):
         fields = ['id', 'phone', 'email', 'full_name', 'vehicle_type', 'password']
         extra_kwargs = {'password': {'write_only': True}}
 
+    def validate(self, data):
+        # Phone is always required
+        if not data.get('phone'):
+            raise serializers.ValidationError({"phone": "Phone number is required"})
+        # Email is required only if otp_method is email
+        return data
+
     def create(self, validated_data):
         password = validated_data.pop('password')
         driver = Driver(**validated_data)
@@ -62,7 +71,7 @@ class AdvertSerializer(serializers.ModelSerializer):
         model = Advert
         fields = ['id', 'image', 'caption', 'is_active', 'created_at']
 
-from .models import Booking
+from .models import Booking, ServiceBooking
 
 class BookingSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.full_name', read_only=True)
@@ -73,8 +82,24 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'customer', 'customer_name', 'driver', 'driver_name',
             'pickup_location', 'destination', 'ride_type',
+            'contact_name', 'contact_phone',
             'fare', 'distance', 'duration',
             'payment_method', 'payment_completed', 'status',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'customer_name', 'driver_name']
+
+
+class ServiceBookingSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.full_name', read_only=True)
+    service_title = serializers.CharField(source='provider_service.title', read_only=True)
+    
+    class Meta:
+        model = ServiceBooking
+        fields = [
+            'id', 'provider_service', 'service_title', 'customer', 'customer_name',
+            'phone', 'number_of_cars', 'total_passengers', 'total_price',
+            'date', 'time', 'status',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'customer_name', 'service_title']

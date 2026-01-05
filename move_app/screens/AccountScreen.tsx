@@ -1,50 +1,155 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../app/auth-context";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const BASE_URL = "http://192.168.1.31:8000";
 
 export default function AccountScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     if (!user) {
       router.replace("/login");
+    } else {
+      loadProfilePicture();
     }
   }, [user]);
-  if (!user) return null;
-  // Example user data
-  const userName = user?.name || 'Alex Johnson';
-  const userEmail = user?.email || 'alex.johnson@email.com';
-  const [avatarUrl, setAvatarUrl] = useState(null);
-  const userInitials = userName ? userName.split(' ').map(n => n[0]).join('') : 'U';
+
+  const loadProfilePicture = async () => {
+    try {
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) return;
+
+      const response = await fetch(`${BASE_URL}/api/corporate/customer/${customerId}/profile/`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.profile_picture) {
+          setAvatarUrl(data.profile_picture);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading profile picture:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const pickImage = async () => {
+    // Request permission
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (permissionResult.granted === false) {
+      Alert.alert("Permission Required", "You need to allow access to your photos to upload a profile picture.");
+      return;
+    }
+
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
     });
+
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setAvatarUrl(result.assets[0].uri);
+      const imageUri = result.assets[0].uri;
+      await uploadProfilePicture(imageUri);
     }
   };
+
+  const uploadProfilePicture = async (imageUri: string) => {
+    try {
+      setUploading(true);
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) {
+        Alert.alert("Error", "Customer ID not found. Please login again.");
+        return;
+      }
+
+      // Create form data
+      const formData = new FormData();
+      const filename = imageUri.split('/').pop() || 'profile.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      formData.append('profile_picture', {
+        uri: imageUri,
+        name: filename,
+        type: type,
+      } as any);
+
+      const response = await fetch(`${BASE_URL}/api/corporate/customer/${customerId}/profile-picture/`, {
+        method: "POST",
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvatarUrl(data.profile_picture);
+        Alert.alert("Success", "Profile picture updated successfully!");
+      } else {
+        const errorData = await response.json();
+        Alert.alert("Error", errorData.error || "Failed to upload profile picture");
+      }
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      Alert.alert("Error", "Failed to upload profile picture. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!user) return null;
+
+  // Example user data
+  const userName = user?.full_name || user?.name || 'Alex Johnson';
+  const userEmail = user?.email || 'alex.johnson@email.com';
+  const userInitials = userName ? userName.split(' ').map((n: string) => n[0]).join('') : 'U';
 
   return (
     <View style={styles.container}>
       <View style={styles.profileCard}>
         <View style={styles.avatarWrapper}>
-          <TouchableOpacity style={styles.avatarTouchable} onPress={pickImage} activeOpacity={0.8}>
-            {avatarUrl ? (
+          <TouchableOpacity 
+            style={styles.avatarTouchable} 
+            onPress={pickImage} 
+            activeOpacity={0.8}
+            disabled={uploading}
+          >
+            {loading ? (
+              <ActivityIndicator size="large" color="#fff" />
+            ) : avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
             ) : (
-              <View style={styles.avatarInitials}><Text style={styles.avatarInitialsText}>{userInitials}</Text></View>
+              <View style={styles.avatarInitials}>
+                <Text style={styles.avatarInitialsText}>{userInitials}</Text>
+              </View>
             )}
-            <View style={styles.cameraIconOverlay}>
-              <MaterialIcons name="photo-camera" size={22} color="#fff" />
-            </View>
+            {uploading ? (
+              <View style={styles.uploadingOverlay}>
+                <ActivityIndicator size="small" color="#fff" />
+              </View>
+            ) : (
+              <View style={styles.cameraIconOverlay}>
+                <MaterialIcons name="photo-camera" size={22} color="#fff" />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
         <Text style={styles.userName}>{userName}</Text>
@@ -100,6 +205,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#35736E',
     borderRadius: 12,
     padding: 3,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    padding: 6,
     borderWidth: 2,
     borderColor: '#fff',
   },

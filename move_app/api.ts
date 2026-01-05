@@ -18,7 +18,11 @@ export const fetchCarsBySupplier = async (supplierId: number) => {
   return res.data;
 };
 
-export const createBooking = async (data: any) => {
-  const res = await axios.post(`${API_BASE}/bookings/`, data);
+export const createBooking = async (data: any, token?: string | null) => {
+  const headers: any = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers.Authorization = `Token ${token}`;
+  }
+  const res = await axios.post(`${API_BASE}/corporate/service-bookings/`, data, { headers });
   return res.data;
 };

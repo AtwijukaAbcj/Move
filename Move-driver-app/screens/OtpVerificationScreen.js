@@ -5,9 +5,10 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 export default function OtpVerificationScreen({ route, navigation }) {
   const phone = route?.params?.phone || "";
   const email = route?.params?.email || "";
+  const initialOtpMethod = route?.params?.otpMethod || (email ? "email" : "phone");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [useEmail, setUseEmail] = useState(!!email);
+  const [useEmail, setUseEmail] = useState(initialOtpMethod === "email");
 
   const onVerify = async () => {
     if (otp.trim().length < 4) {

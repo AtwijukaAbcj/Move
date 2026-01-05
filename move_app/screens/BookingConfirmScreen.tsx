@@ -6,10 +6,14 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  TextInput,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import MapView, { Marker, Polyline } from "react-native-maps";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "../app/auth-context";
 
 const THEME = {
   primary: "#35736E",
@@ -22,6 +26,7 @@ const THEME = {
 export default function BookingConfirmScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { user } = useAuth();
   
   const pickup = params.pickup as string || "Pick up location";
   const destination = params.destination as string || "Destination";
@@ -30,8 +35,21 @@ export default function BookingConfirmScreen() {
   const [estimatedFare, setEstimatedFare] = useState(0);
   const [distance, setDistance] = useState("0");
   const [duration, setDuration] = useState("0");
+  const [contactPhone, setContactPhone] = useState("");
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
+    // Get user details
+    if (user) {
+      setUserName(user.full_name || user.name || "");
+      setUserEmail(user.email || "");
+      // Pre-fill phone if available in user object
+      if (user.phone) {
+        setContactPhone(user.phone);
+      }
+    }
+    
     // Calculate estimated fare based on ride type
     const baseFares = { standard: 15, xl: 25, premium: 35 };
     const fare = baseFares[rideType as keyof typeof baseFares] || 15;
@@ -40,7 +58,7 @@ export default function BookingConfirmScreen() {
     // Mock distance and duration
     setDistance((3 + Math.random() * 7).toFixed(1));
     setDuration((10 + Math.random() * 20).toFixed(0));
-  }, [rideType]);
+  }, [rideType, user]);
 
   const getRideInfo = () => {
     const rides = {
@@ -163,15 +181,23 @@ export default function BookingConfirmScreen() {
         </View>
 
         {/* Payment Method Prompt */}
+
+        {/* Contact Information */}
         <View style={styles.card}>
-          <View style={styles.paymentPromptRow}>
-            <Ionicons name="card-outline" size={24} color={THEME.aqua} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.paymentPromptTitle}>Payment Method</Text>
-              <Text style={styles.paymentPromptSub}>Select your payment method</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9AA4B2" />
+          <Text style={styles.cardTitle}>Contact Phone (Optional)</Text>
+          
+          <View style={styles.inputContainer}>
+            <Ionicons name="call-outline" size={20} color="#9AA4B2" />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter phone number for this ride"
+              placeholderTextColor="#9AA4B2"
+              value={contactPhone}
+              onChangeText={setContactPhone}
+              keyboardType="phone-pad"
+            />
           </View>
+          <Text style={styles.helperText}>Optional: Add a phone number for the driver to reach you for this specific ride</Text>
         </View>
       </ScrollView>
 
@@ -180,17 +206,20 @@ export default function BookingConfirmScreen() {
         <TouchableOpacity
           style={styles.primaryBtn}
           activeOpacity={0.9}
-          onPress={() => router.push({
-            pathname: "/payment-method",
-            params: { 
-              pickup, 
-              destination, 
-              rideType, 
-              fare: estimatedFare.toFixed(2),
-              distance,
-              duration 
-            }
-          })}
+          onPress={() => {
+            router.push({
+              pathname: "/payment-method",
+              params: { 
+                pickup, 
+                destination, 
+                rideType, 
+                fare: estimatedFare.toFixed(2),
+                distance,
+                duration,
+                contactPhone
+              }
+            });
+          }}
         >
           <Text style={styles.primaryBtnText}>Continue to Payment</Text>
           <Ionicons name="arrow-forward" size={20} color={THEME.ink} />
@@ -293,6 +322,54 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   breakdownLabel: { color: "#9AA4B2", fontSize: 14, fontWeight: "700" },
+  breakdownValue: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  divider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    marginVertical: 12,
+  },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  totalLabel: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  totalValue: { color: THEME.aqua, fontSize: 24, fontWeight: "900" },
+
+  paymentPromptRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  paymentPromptTitle: { color: "#fff", fontSize: 15, fontWeight: "900", marginBottom: 2 },
+  paymentPromptSub: { color: "#9AA4B2", fontSize: 13, fontWeight: "700" },
+
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  infoValue: { color: "#fff", fontSize: 15, fontWeight: "700", flex: 1 },
+
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  input: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  helperText: {
+    color: "#9AA4B2",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 8,
+  },
   breakdownValue: { color: "#fff", fontSize: 14, fontWeight: "800" },
 
   divider: {

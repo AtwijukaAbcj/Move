@@ -22,6 +22,8 @@ import { ProviderService } from "../models/ProviderService";
 import { fetchProviderServiceById } from "../api/providerServiceDetail";
 import { createBooking } from "../api";
 import { useAuth } from "../app/auth-context"; // ✅ adjust if you moved auth-context elsewhere
+import { addNotification } from "../utils/notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const BASE_URL = "http://192.168.1.31:8000";
 
@@ -38,7 +40,7 @@ function money(amount: any, currency?: string) {
 
 export default function ServiceDetailScreen() {
   const { providerServiceId } = useLocalSearchParams();
-  const { token } = useAuth(); // ✅ token from auth context
+  const { token, user } = useAuth(); // ✅ Get user from auth context
 
   const [service, setService] = useState<ProviderService | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,10 +51,10 @@ export default function ServiceDetailScreen() {
 
   // booking
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
-  const [bookingName, setBookingName] = useState("");
   const [bookingPhone, setBookingPhone] = useState("");
   const [bookingDate, setBookingDate] = useState(new Date());
   const [bookingTime, setBookingTime] = useState(new Date());
+  const [numberOfCars, setNumberOfCars] = useState(1);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -94,10 +96,16 @@ export default function ServiceDetailScreen() {
       .filter(Boolean) as string[];
   }, [service]);
 
+  const totalPassengers = numberOfCars * 4;
+  const basePrice = (service as any)?.base_price || 0;
+  const totalPrice = basePrice * numberOfCars;
+
   const headerTitle = service?.title || "Service Details";
 
-  const priceText =
-    money((service as any)?.base_price, (service as any)?.currency) || "Price on request";
+  const pricePerCar = money((service as any)?.base_price, (service as any)?.currency) || "Price on request";
+  const totalPriceText = numberOfCars > 1 
+    ? `${money(totalPrice, (service as any)?.currency)} (${numberOfCars} cars)`
+    : pricePerCar;
 
   const stats = useMemo(
     () => [
@@ -194,7 +202,7 @@ export default function ServiceDetailScreen() {
                   </Text>
                   <View style={styles.heroPriceRow}>
                     <Text style={styles.heroPriceLabel}>Starting from</Text>
-                    <Text style={styles.heroPrice}>{priceText}</Text>
+                    <Text style={styles.heroPrice}>{totalPriceText}</Text>
                   </View>
                 </View>
               </View>
@@ -276,21 +284,9 @@ export default function ServiceDetailScreen() {
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Location</Text>
+                <Text style={styles.detailLabel}>Location Area</Text>
                 <Text style={styles.detailValue}>
                   {String((service as any)?.location || (service as any)?.city || "—")}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Contact</Text>
-                <Text style={styles.detailValue}>
-                  {String(
-                    (service as any)?.phone ||
-                      (service as any)?.provider?.phone ||
-                      (service as any)?.provider?.contact ||
-                      "—"
-                  )}
                 </Text>
               </View>
             </View>
@@ -314,7 +310,7 @@ export default function ServiceDetailScreen() {
             <View style={styles.ctaBar}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.ctaSmall}>Total</Text>
-                <Text style={styles.ctaBig}>{priceText}</Text>
+                <Text style={styles.ctaBig}>{totalPriceText}</Text>
               </View>
 
               <TouchableOpacity
@@ -387,26 +383,61 @@ export default function ServiceDetailScreen() {
               </View>
 
               <View style={styles.inputRow}>
-                <Ionicons name="person-outline" size={16} color="#9AA4B2" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Your Name"
-                  placeholderTextColor="#9AA4B2"
-                  value={bookingName}
-                  onChangeText={setBookingName}
-                />
-              </View>
-
-              <View style={styles.inputRow}>
                 <Ionicons name="call-outline" size={16} color="#9AA4B2" />
                 <TextInput
                   style={styles.input}
-                  placeholder="Phone Number"
+                  placeholder="Phone Number (optional)"
                   placeholderTextColor="#9AA4B2"
                   value={bookingPhone}
                   onChangeText={setBookingPhone}
                   keyboardType="phone-pad"
                 />
+              </View>
+              <Text style={styles.helperText}>Optional: Add a phone number for this booking</Text>
+
+              {/* Number of Cars Selector */}
+              <View style={styles.carSelectorContainer}>
+                <View style={styles.carSelectorHeader}>
+                  <View>
+                    <Text style={styles.carSelectorTitle}>Number of Cars</Text>
+                    <Text style={styles.carSelectorSubtitle}>4 passengers per car</Text>
+                  </View>
+                  <View style={styles.passengerInfo}>
+                    <Ionicons name="people-outline" size={16} color="#5EC6C6" />
+                    <Text style={styles.passengerText}>Max {totalPassengers} passengers</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.carSelectorControls}>
+                  <TouchableOpacity
+                    style={[styles.carButton, numberOfCars <= 1 && styles.carButtonDisabled]}
+                    onPress={() => setNumberOfCars(Math.max(1, numberOfCars - 1))}
+                    disabled={numberOfCars <= 1}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="remove" size={20} color={numberOfCars <= 1 ? "#6B7280" : "#fff"} />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.carCountContainer}>
+                    <Ionicons name="car-outline" size={24} color="#5EC6C6" />
+                    <Text style={styles.carCountText}>{numberOfCars}</Text>
+                  </View>
+                  
+                  <TouchableOpacity
+                    style={[styles.carButton, numberOfCars >= 10 && styles.carButtonDisabled]}
+                    onPress={() => setNumberOfCars(Math.min(10, numberOfCars + 1))}
+                    disabled={numberOfCars >= 10}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={20} color={numberOfCars >= 10 ? "#6B7280" : "#fff"} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.priceBreakdown}>
+                  <Text style={styles.priceBreakdownText}>
+                    {pricePerCar} × {numberOfCars} car{numberOfCars > 1 ? 's' : ''} = <Text style={styles.totalPriceText}>{money(totalPrice, (service as any)?.currency)}</Text>
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.pickerRow}>
@@ -478,19 +509,60 @@ export default function ServiceDetailScreen() {
                     setBookingSuccess(false);
 
                     try {
-                      await createBooking(
+                      if (!user?.id) {
+                        setBookingError("Please login to book this service");
+                        return;
+                      }
+                      
+                      console.log("Creating service booking...", {
+                        provider_service: (service as any).id,
+                        customer: user.id,
+                        phone: bookingPhone,
+                        number_of_cars: numberOfCars,
+                        total_passengers: totalPassengers,
+                        total_price: totalPrice,
+                        date: bookingDate.toISOString().split("T")[0],
+                        time: bookingTime.toTimeString().slice(0, 5),
+                      });
+                      
+                      const bookingResult = await createBooking(
                         {
                           provider_service: (service as any).id,
-                          name: bookingName,
+                          customer: user.id,
                           phone: bookingPhone,
+                          number_of_cars: numberOfCars,
+                          total_passengers: totalPassengers,
+                          total_price: totalPrice,
                           date: bookingDate.toISOString().split("T")[0],
                           time: bookingTime.toTimeString().slice(0, 5),
                         },
                         token
                       );
+                      
                       setBookingSuccess(true);
-                    } catch {
-                      setBookingError("Booking failed. Please try again.");
+                      
+                      // Add notification for successful booking
+                      const customerId = await AsyncStorage.getItem("customerId");
+                      if (customerId) {
+                        await addNotification(
+                          customerId,
+                          'Booking Confirmed! 🎉',
+                          `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} at ${bookingTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} has been confirmed.`,
+                          'service',
+                          { bookingId: bookingResult?.id, serviceTitle: service.title }
+                        );
+                      }
+                      
+                      setTimeout(() => {
+                        setBookingModalVisible(false);
+                        setBookingSuccess(false);
+                      }, 2000);
+                    } catch (error: any) {
+                      console.error("Booking error:", error);
+                      console.error("Error response:", error?.response?.data);
+                      console.error("Error status:", error?.response?.status);
+                      const errorMsg = error?.response?.data?.detail || error?.response?.data?.error || JSON.stringify(error?.response?.data) || "Booking failed. Please try again.";
+                      setBookingError(errorMsg);
                     } finally {
                       setBookingLoading(false);
                     }
@@ -730,6 +802,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   input: { flex: 1, color: "#fff", fontWeight: "700" },
+  helperText: { 
+    color: "#9AA4B2", 
+    fontSize: 12, 
+    fontWeight: "600", 
+    marginTop: -6, 
+    marginBottom: 10,
+    paddingHorizontal: 4
+  },
 
   pickerRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   picker: {
@@ -744,6 +824,101 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   pickerText: { color: "#fff", fontWeight: "800" },
+
+  carSelectorContainer: {
+    backgroundColor: '#2D313A',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(94, 198, 198, 0.2)',
+  },
+  carSelectorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  carSelectorTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  carSelectorSubtitle: {
+    color: '#B0BEC5',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  passengerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(94, 198, 198, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  passengerText: {
+    color: '#5EC6C6',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  carSelectorControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    marginBottom: 12,
+  },
+  carButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#5EC6C6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  carButtonDisabled: {
+    backgroundColor: '#3D4350',
+    opacity: 0.5,
+  },
+  carCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#23272F',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+    minWidth: 100,
+    justifyContent: 'center',
+  },
+  carCountText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  priceBreakdown: {
+    backgroundColor: '#23272F',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  priceBreakdownText: {
+    color: '#B0BEC5',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  totalPriceText: {
+    color: '#FFA726',
+    fontSize: 16,
+    fontWeight: '900',
+  },
 
   msgError: {
     color: "#FFB4A2",

@@ -1,6 +1,7 @@
 // app/auth-context.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type User = any;
 
@@ -57,6 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await SecureStore.setItemAsync("user", JSON.stringify(u));
     if (t) await SecureStore.setItemAsync("token", t);
     else await SecureStore.deleteItemAsync("token");
+    
+    // Store customer ID in AsyncStorage for API calls
+    if (u?.id) {
+      await AsyncStorage.setItem("customerId", u.id.toString());
+    }
   };
 
   const logout = async () => {
@@ -64,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     await SecureStore.deleteItemAsync("user");
     await SecureStore.deleteItemAsync("token");
+    await AsyncStorage.removeItem("customerId");
   };
 
   const value = useMemo(

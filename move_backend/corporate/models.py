@@ -48,6 +48,7 @@ class Customer(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20, blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='customer_profiles/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
@@ -98,6 +99,12 @@ class Driver(AbstractBaseUser, PermissionsMixin):
     vehicle_type = models.CharField(max_length=50, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     is_online = models.BooleanField(default=False, help_text='Driver online/offline status')
+    
+    # Location tracking for driver matching
+    current_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    current_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    location_updated_at = models.DateTimeField(null=True, blank=True)
+    
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
     otp_code = models.CharField(max_length=6, blank=True, null=True)
@@ -132,6 +139,21 @@ class Driver(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.full_name or self.phone or self.email
+    
+    def has_uploaded_documents(self):
+        """Check if driver has uploaded all required documents"""
+        return all([
+            self.drivers_license,
+            self.car_ownership,
+            self.car_image_1,
+            self.car_image_2,
+            self.inspection_report
+        ])
+    
+    def can_receive_requests(self):
+        """Check if driver is eligible to receive ride requests"""
+        return self.has_uploaded_documents() and self.is_approved and self.otp_verified
+    
 from django.db import models
 
 class Advert(models.Model):
@@ -206,8 +228,9 @@ class Booking(models.Model):
     
     STATUS_CHOICES = [
         ('pending', 'Pending'),
-        ('confirmed', 'Confirmed'),
+        ('searching_driver', 'Searching Driver'),
         ('driver_assigned', 'Driver Assigned'),
+        ('driver_arrived', 'Driver Arrived'),
         ('picked_up', 'Picked Up'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
@@ -220,6 +243,16 @@ class Booking(models.Model):
     destination = models.CharField(max_length=500)
     ride_type = models.CharField(max_length=20, choices=RIDE_TYPE_CHOICES)
     
+    # Optional contact information for this specific ride
+    contact_name = models.CharField(max_length=255, blank=True, null=True, help_text='Optional contact name for this ride')
+    contact_phone = models.CharField(max_length=20, blank=True, null=True, help_text='Optional contact phone for this ride')
+    
+    # Location coordinates for driver matching
+    pickup_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    pickup_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    destination_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    destination_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    
     fare = models.DecimalField(max_digits=10, decimal_places=2)
     distance = models.DecimalField(max_digits=10, decimal_places=2, help_text='Distance in kilometers')
     duration = models.IntegerField(help_text='Duration in minutes')
@@ -229,8 +262,46 @@ class Booking(models.Model):
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
+    # Receipt tracking
+    receipt_sent = models.BooleanField(default=False)
+    receipt_sent_at = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"Booking #{self.id} - {self.customer} - {self.status}"
+
+
+class ServiceBooking(models.Model):
+    """Booking for provider services (Airport drop offs, etc.)"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    provider_service = models.ForeignKey(ProviderService, on_delete=models.CASCADE, related_name='bookings')
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='service_bookings')
+    
+    # Optional contact phone for this specific booking
+    phone = models.CharField(max_length=20, blank=True, null=True, help_text='Optional contact phone for this booking')
+    
+    # Number of cars and passengers
+    number_of_cars = models.IntegerField(default=1, help_text='Number of cars required')
+    total_passengers = models.IntegerField(default=4, help_text='Total number of passengers (4 per car)')
+    total_price = models.DecimalField(max_digits=10, decimal_places=2, help_text='Total price for all cars')
+    
+    date = models.DateField()
+    time = models.TimeField()
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Booking #{self.id} - {self.customer} - {self.status}"
+        return f"Service Booking #{self.id} - {self.customer} - {self.provider_service.title}"

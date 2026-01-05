@@ -10,13 +10,15 @@ REST_FRAMEWORK = {
 # Use custom Customer model as the user model
 AUTH_USER_MODEL = 'corporate.Customer'
 # Email settings for OTP and notifications
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'mail.solichsystems.com'
-EMAIL_PORT = 465
-EMAIL_HOST_USER = 'info@solichsystems.com'
-EMAIL_HOST_PASSWORD = 'GY-kG%NpO7~ot+i'
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = True
+# Email Configuration - Using console backend for testing (prints to terminal)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'mail.solichsystems.com'
+# EMAIL_PORT = 465
+# EMAIL_HOST_USER = 'info@solichsystems.com'
+# EMAIL_HOST_PASSWORD = 'GY-kG%NpO7~ot+i'
+# EMAIL_USE_TLS = False
+# EMAIL_USE_SSL = True
 DEFAULT_FROM_EMAIL = 'SOLICH <info@solichsystems.com>'
 """
 Django settings for move_backend project.

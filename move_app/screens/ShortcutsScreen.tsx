@@ -57,7 +57,10 @@ export default function ShortcutsScreen() {
 
   const loadShortcuts = async () => {
     try {
-      const stored = await AsyncStorage.getItem("move_shortcuts");
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) return;
+      
+      const stored = await AsyncStorage.getItem(`move_shortcuts_${customerId}`);
       if (stored) {
         setShortcuts(JSON.parse(stored));
       } else {
@@ -81,7 +84,7 @@ export default function ShortcutsScreen() {
           },
         ];
         setShortcuts(defaultShortcuts);
-        await AsyncStorage.setItem("move_shortcuts", JSON.stringify(defaultShortcuts));
+        await AsyncStorage.setItem(`move_shortcuts_${customerId}`, JSON.stringify(defaultShortcuts));
       }
     } catch (error) {
       console.error("Error loading shortcuts:", error);
@@ -90,7 +93,10 @@ export default function ShortcutsScreen() {
 
   const saveShortcuts = async (newShortcuts: Shortcut[]) => {
     try {
-      await AsyncStorage.setItem("move_shortcuts", JSON.stringify(newShortcuts));
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) return;
+      
+      await AsyncStorage.setItem(`move_shortcuts_${customerId}`, JSON.stringify(newShortcuts));
       setShortcuts(newShortcuts);
     } catch (error) {
       console.error("Error saving shortcuts:", error);
