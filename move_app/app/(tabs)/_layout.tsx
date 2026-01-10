@@ -1,7 +1,7 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { Platform } from "react-native";
+import { Platform, View } from "react-native";
 
 export default function TabLayout() {
   return (
@@ -19,6 +19,18 @@ export default function TabLayout() {
           height: Platform.OS === "ios" ? 88 : 72,
           paddingTop: 10,
           paddingBottom: Platform.OS === "ios" ? 24 : 12,
+          marginHorizontal: 12,
+          marginBottom: Platform.OS === "ios" ? 20 : 12,
+          borderRadius: 24,
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
         },
 
         tabBarLabelStyle: {
@@ -30,7 +42,7 @@ export default function TabLayout() {
         // subtle "floating" feel
         tabBarItemStyle: {
           borderRadius: 16,
-          marginHorizontal: 8,
+          marginHorizontal: 4,
           marginVertical: 6,
         },
       }}

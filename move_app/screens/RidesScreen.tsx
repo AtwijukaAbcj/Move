@@ -10,14 +10,19 @@ import {
   Pressable,
   ScrollView,
   Modal,
+  Alert,
+  ActivityIndicator,
+  Linking,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useAuth } from "../app/auth-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const GOOGLE_MAPS_API_KEY = "AIzaSyAEIJNjKs7Kxr5DstLl_Slzp5oCk8Ba2l0";
+const BASE_URL = "http://192.168.1.31:8000";
 
 export default function RidesScreen() {
   const { user } = useAuth();
@@ -31,9 +36,51 @@ export default function RidesScreen() {
 
   const [pickup, setPickup] = useState("");
   const [destination, setDestination] = useState("");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [pickupSuggestions, setPickupSuggestions] = useState<any[]>([]);
   const [destinationSuggestions, setDestinationSuggestions] = useState<any[]>([]);
   const [activeInput, setActiveInput] = useState<"pickup" | "destination" | null>(null);
+  
+  // Active ride state
+  const [activeRide, setActiveRide] = useState<any>(null);
+  const [checkingActiveRide, setCheckingActiveRide] = useState(true);
+
+  // Check for active rides when screen loads
+  useFocusEffect(
+    React.useCallback(() => {
+      checkForActiveRide();
+    }, [])
+  );
+
+  const checkForActiveRide = async () => {
+    try {
+      setCheckingActiveRide(true);
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) {
+        setCheckingActiveRide(false);
+        return;
+      }
+
+      const response = await fetch(`${BASE_URL}/api/corporate/customer/${customerId}/bookings/`);
+      if (response.ok) {
+        const bookings = await response.json();
+        // Find any ride that is in progress (not completed, cancelled, or pending)
+        const activeStatuses = ['driver_assigned', 'driver_arrived', 'in_progress', 'searching_driver'];
+        const active = bookings.find((b: any) => activeStatuses.includes(b.status));
+        
+        if (active) {
+          setActiveRide(active);
+        } else {
+          setActiveRide(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking active ride:", error);
+    } finally {
+      setCheckingActiveRide(false);
+    }
+  };
 
   useEffect(() => {
     if (params.destination) {
@@ -79,7 +126,7 @@ export default function RidesScreen() {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
           query
-        )}&key=${GOOGLE_MAPS_API_KEY}&components=country:ug`
+        )}&key=${GOOGLE_MAPS_API_KEY}&components=country:us`
       );
       const data = await response.json();
       
@@ -95,7 +142,7 @@ export default function RidesScreen() {
     }
   };
 
-  const selectSuggestion = (suggestion: any, type: "pickup" | "destination") => {
+  const selectSuggestion = async (suggestion: any, type: "pickup" | "destination") => {
     if (type === "pickup") {
       setPickup(suggestion.description);
       setPickupSuggestions([]);
@@ -104,6 +151,26 @@ export default function RidesScreen() {
       setDestinationSuggestions([]);
     }
     setActiveInput(null);
+
+    // Fetch place details to get coordinates
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${suggestion.place_id}&fields=geometry&key=${GOOGLE_MAPS_API_KEY}`
+      );
+      const data = await response.json();
+      
+      if (data.result?.geometry?.location) {
+        const { lat, lng } = data.result.geometry.location;
+        if (type === "pickup") {
+          setPickupCoords({ lat, lng });
+          setRegion({ ...region, latitude: lat, longitude: lng });
+        } else {
+          setDestinationCoords({ lat, lng });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching place details:", error);
+    }
   };
 
   useEffect(() => {
@@ -117,6 +184,229 @@ export default function RidesScreen() {
 
     return () => clearTimeout(timeoutId);
   }, [pickup, destination, activeInput]);
+
+  // Show loading while checking for active ride
+  if (checkingActiveRide) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1A1F26' }]}>
+        <ActivityIndicator size="large" color="#5EC6C6" />
+        <Text style={{ color: '#fff', marginTop: 16, fontWeight: '700' }}>Checking ride status...</Text>
+      </View>
+    );
+  }
+
+  // Show active ride card if user has an ongoing ride
+  if (activeRide) {
+    const statusLabels: Record<string, string> = {
+      'searching_driver': 'Searching for driver...',
+      'driver_assigned': 'Driver is on the way',
+      'driver_arrived': 'Driver has arrived',
+      'in_progress': 'Ride in progress',
+    };
+
+    const hasDriver = activeRide.driver && activeRide.status !== 'searching_driver';
+
+    return (
+      <View style={[styles.container, { backgroundColor: '#1A1F26' }]}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={styles.activeRideContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Status Icon */}
+          <View style={[styles.activeRideIcon, hasDriver && { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
+            <Ionicons 
+              name={hasDriver ? "checkmark-circle" : "car-sport"} 
+              size={48} 
+              color={hasDriver ? "#4CAF50" : "#5EC6C6"} 
+            />
+          </View>
+          
+          <Text style={styles.activeRideTitle}>
+            {hasDriver ? 'Driver Accepted!' : 'You have an active ride'}
+          </Text>
+          <Text style={styles.activeRideStatus}>{statusLabels[activeRide.status] || activeRide.status}</Text>
+          
+          {/* Driver Card - Show when driver is assigned */}
+          {hasDriver && (
+            <View style={styles.driverCard}>
+              <View style={styles.driverCardHeader}>
+                <View style={styles.driverAvatarContainer}>
+                  <View style={styles.driverAvatar}>
+                    <Ionicons name="person" size={28} color="#5EC6C6" />
+                  </View>
+                  <View style={styles.driverOnlineIndicator} />
+                </View>
+                <View style={styles.driverInfo}>
+                  <Text style={styles.driverName}>{activeRide.driver.full_name || 'Your Driver'}</Text>
+                  <View style={styles.driverRatingRow}>
+                    <Ionicons name="star" size={14} color="#FFC107" />
+                    <Text style={styles.driverRating}>{activeRide.driver.rating || '5.0'}</Text>
+                    <Text style={styles.driverTrips}>• {activeRide.driver.total_trips || 0} trips</Text>
+                  </View>
+                </View>
+                <View style={styles.driverActions}>
+                  <TouchableOpacity 
+                    style={styles.driverActionBtn}
+                    onPress={() => {
+                      if (activeRide.driver.phone) {
+                        Linking.openURL(`tel:${activeRide.driver.phone}`);
+                      }
+                    }}
+                  >
+                    <Ionicons name="call" size={20} color="#5EC6C6" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.driverActionBtn}
+                    onPress={() => {
+                      router.push({
+                        pathname: '/chat',
+                        params: { 
+                          recipientId: activeRide.driver.id,
+                          recipientName: activeRide.driver.full_name,
+                          bookingId: activeRide.id
+                        }
+                      });
+                    }}
+                  >
+                    <Ionicons name="chatbubble" size={20} color="#5EC6C6" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              {/* Vehicle Info */}
+              <View style={styles.vehicleInfo}>
+                <Ionicons name="car-sport" size={18} color="#9AA4B2" />
+                <Text style={styles.vehicleText}>
+                  {activeRide.driver.vehicle_type || 'Standard Vehicle'}
+                </Text>
+                {/* Vehicle Number Plate */}
+                <View style={{ marginLeft: 16, backgroundColor: '#FFD700', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#23272F', fontWeight: 'bold', fontSize: 16, letterSpacing: 2 }}>
+                    {activeRide.driver.vehicle_number || 'MOV-0000'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* ETA Badge */}
+              <View style={styles.etaBadge}>
+                <Ionicons name="time-outline" size={16} color="#5EC6C6" />
+                <Text style={styles.etaBadgeText}>Arriving in 3-5 min</Text>
+              </View>
+            </View>
+          )}
+          
+          <View style={styles.activeRideDetails}>
+            <View style={styles.activeRideRow}>
+              <Ionicons name="location" size={18} color="#5EC6C6" />
+              <Text style={styles.activeRideText} numberOfLines={2}>{activeRide.pickup_location}</Text>
+            </View>
+            <View style={styles.activeRideDivider} />
+            <View style={styles.activeRideRow}>
+              <Ionicons name="flag" size={18} color="#FFA726" />
+              <Text style={styles.activeRideText} numberOfLines={2}>{activeRide.destination}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.trackRideBtn}
+            onPress={() => router.push({ pathname: '/ride-tracking', params: { bookingId: activeRide.id } })}
+            activeOpacity={0.9}
+          >
+            <Ionicons name="navigate" size={20} color="#0f1a19" />
+            <Text style={styles.trackRideBtnText}>Track Your Ride</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelRideBtn}
+            onPress={() => {
+              Alert.alert(
+                "Cancel Ride",
+                "Are you sure you want to cancel this ride?",
+                [
+                  { text: "No", style: "cancel" },
+                  { 
+                    text: "Yes, Cancel", 
+                    style: "destructive",
+                    onPress: async () => {
+                      try {
+                        const response = await fetch(`${BASE_URL}/api/corporate/bookings/${activeRide.id}/cancel/`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                        });
+                        if (response.ok) {
+                          Alert.alert("Cancelled", "Your ride has been cancelled.");
+                          setActiveRide(null);
+                        } else {
+                          Alert.alert("Error", "Failed to cancel ride. Please try again.");
+                        }
+                      } catch (error) {
+                        Alert.alert("Error", "Failed to cancel ride. Please try again.");
+                      }
+                    }
+                  }
+                ]
+              );
+            }}
+            activeOpacity={0.9}
+          >
+            <Ionicons name="close-circle" size={20} color="#FF5252" />
+            <Text style={styles.cancelRideBtnText}>Cancel Ride</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.backHomeBtn}
+            onPress={() => router.push('/home')}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.backHomeBtnText}>Back to Home</Text>
+          </TouchableOpacity>
+          
+          {/* Spacer for floating nav */}
+          <View style={{ height: 100 }} />
+        </ScrollView>
+        
+        {/* Floating Bottom Navigation */}
+        <View style={styles.floatingNav}>
+          <TouchableOpacity 
+            style={styles.floatingNavItem} 
+            onPress={() => router.push('/(tabs)/home')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="home-outline" size={24} color="rgba(255,255,255,0.65)" />
+            <Text style={styles.floatingNavLabel}>Home</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.floatingNavItem} 
+            onPress={() => router.push('/(tabs)/service')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="apps-outline" size={24} color="rgba(255,255,255,0.65)" />
+            <Text style={styles.floatingNavLabel}>Services</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.floatingNavItem} 
+            onPress={() => router.push('/(tabs)/activity')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="time-outline" size={24} color="rgba(255,255,255,0.65)" />
+            <Text style={styles.floatingNavLabel}>Activity</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.floatingNavItem} 
+            onPress={() => router.push('/(tabs)/account')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="person-outline" size={24} color="rgba(255,255,255,0.65)" />
+            <Text style={styles.floatingNavLabel}>Account</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -205,81 +495,97 @@ export default function RidesScreen() {
             </View>
           </View>
 
-          {/* Pickup Suggestions */}
-          {activeInput === "pickup" && pickupSuggestions.length > 0 && (
-            <ScrollView style={styles.suggestionsContainer} keyboardShouldPersistTaps="handled">
-              {pickupSuggestions.map((suggestion) => (
-                <TouchableOpacity
-                  key={suggestion.place_id}
-                  style={styles.suggestionItem}
-                  onPress={() => selectSuggestion(suggestion, "pickup")}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.suggestionIcon}>
-                    <Ionicons name="location-outline" size={18} color="#5EC6C6" />
-                  </View>
-                  <View style={styles.suggestionText}>
-                    <Text style={styles.suggestionMainText} numberOfLines={1}>
-                      {suggestion.structured_formatting?.main_text || suggestion.description}
-                    </Text>
-                    <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
-                      {suggestion.structured_formatting?.secondary_text || ""}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+          {/* Suggestions Container - positioned relative to overlay content */}
+          <View style={styles.suggestionsWrapper}>
+            {/* Pickup Suggestions */}
+            {activeInput === "pickup" && pickupSuggestions.length > 0 && (
+              <ScrollView 
+                style={styles.suggestionsContainer} 
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true}
+              >
+                {pickupSuggestions.map((suggestion) => (
+                  <TouchableOpacity
+                    key={suggestion.place_id}
+                    style={styles.suggestionItem}
+                    onPress={() => selectSuggestion(suggestion, "pickup")}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.suggestionIcon}>
+                      <Ionicons name="location-outline" size={18} color="#5EC6C6" />
+                    </View>
+                    <View style={styles.suggestionText}>
+                      <Text style={styles.suggestionMainText} numberOfLines={1}>
+                        {suggestion.structured_formatting?.main_text || suggestion.description}
+                      </Text>
+                      <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
+                        {suggestion.structured_formatting?.secondary_text || ""}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
 
-          {/* Destination Suggestions */}
-          {activeInput === "destination" && destinationSuggestions.length > 0 && (
-            <ScrollView style={styles.suggestionsContainer} keyboardShouldPersistTaps="handled">
-              {destinationSuggestions.map((suggestion) => (
-                <TouchableOpacity
-                  key={suggestion.place_id}
-                  style={styles.suggestionItem}
-                  onPress={() => selectSuggestion(suggestion, "destination")}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.suggestionIcon}>
-                    <Ionicons name="location-outline" size={18} color="#FFA726" />
-                  </View>
-                  <View style={styles.suggestionText}>
-                    <Text style={styles.suggestionMainText} numberOfLines={1}>
-                      {suggestion.structured_formatting?.main_text || suggestion.description}
-                    </Text>
-                    <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
-                      {suggestion.structured_formatting?.secondary_text || ""}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+            {/* Destination Suggestions */}
+            {activeInput === "destination" && destinationSuggestions.length > 0 && (
+              <ScrollView 
+                style={styles.suggestionsContainer} 
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true}
+              >
+                {destinationSuggestions.map((suggestion) => (
+                  <TouchableOpacity
+                    key={suggestion.place_id}
+                    style={styles.suggestionItem}
+                    onPress={() => selectSuggestion(suggestion, "destination")}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.suggestionIcon}>
+                      <Ionicons name="location-outline" size={18} color="#FFA726" />
+                    </View>
+                    <View style={styles.suggestionText}>
+                      <Text style={styles.suggestionMainText} numberOfLines={1}>
+                        {suggestion.structured_formatting?.main_text || suggestion.description}
+                      </Text>
+                      <Text style={styles.suggestionSecondaryText} numberOfLines={1}>
+                        {suggestion.structured_formatting?.secondary_text || ""}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
           
-          {/* Quick chips */}
+          {/* Quick chips - hidden when suggestions are showing */}
+          {!(activeInput && (pickupSuggestions.length > 0 || destinationSuggestions.length > 0)) && (
           <View style={styles.chipsRow}>
-            <TouchableOpacity style={styles.chip} activeOpacity={0.9}>
-              <MaterialIcons name="home" size={16} color="#35736E" />
-              <Text style={styles.chipText}>Home</Text>
+            {/* Most recent shortcuts, e.g., Home and Work, could be dynamic in a real app */}
+            <TouchableOpacity style={styles.chipOutline} activeOpacity={0.9}>
+              <MaterialIcons name="home" size={16} color={THEME.primary} />
+              <Text style={styles.chipTextOutline}>Home</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.chip} activeOpacity={0.9}>
-              <MaterialIcons name="work" size={16} color="#35736E" />
-              <Text style={styles.chipText}>Work</Text>
+            <TouchableOpacity style={styles.chipOutline} activeOpacity={0.9}>
+              <MaterialIcons name="work" size={16} color={THEME.primary} />
+              <Text style={styles.chipTextOutline}>Work</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.chip} 
+              style={styles.chipOutline} 
               activeOpacity={0.9}
               onPress={() => setShowScheduleModal(true)}
             >
-              <Ionicons name="time-outline" size={16} color="#35736E" />
-              <Text style={styles.chipText}>Schedule</Text>
+              <Ionicons name="time-outline" size={16} color={THEME.primary} />
+              <Text style={styles.chipTextOutline}>Schedule</Text>
             </TouchableOpacity>
           </View>
+          )}
 
-          {/* Ride options */}
+          {/* Ride options - hidden when suggestions are showing */}
+          {!(activeInput && (pickupSuggestions.length > 0 || destinationSuggestions.length > 0)) && (
+          <>
           <Text style={styles.sectionLabel}>Choose a ride</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 8 }}>
             {rideOptions.map((r) => {
@@ -321,7 +627,11 @@ export default function RidesScreen() {
                 params: {
                   pickup,
                   destination,
-                  selectedRide
+                  selectedRide,
+                  pickupLat: pickupCoords?.lat?.toString() || "",
+                  pickupLng: pickupCoords?.lng?.toString() || "",
+                  destLat: destinationCoords?.lat?.toString() || "",
+                  destLng: destinationCoords?.lng?.toString() || "",
                 }
               });
             }}
@@ -331,6 +641,8 @@ export default function RidesScreen() {
           </TouchableOpacity>
 
           <Text style={styles.helperText}>Tip: Add pickup & destination to enable request.</Text>
+          </>
+          )}
         </View>
 
         {/* Schedule Modal */}
@@ -422,6 +734,10 @@ export default function RidesScreen() {
                         selectedRide,
                         scheduled: "true",
                         scheduledDateTime: combinedDateTime.toISOString(),
+                        pickupLat: pickupCoords?.lat?.toString() || "",
+                        pickupLng: pickupCoords?.lng?.toString() || "",
+                        destLat: destinationCoords?.lat?.toString() || "",
+                        destLng: destinationCoords?.lng?.toString() || "",
                       }
                     });
                   }}
@@ -568,17 +884,19 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 12,
   },
-  chip: {
+  chipOutline: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: 'transparent',
     borderRadius: 14,
     paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
+    borderWidth: 1,
+    borderColor: THEME.primary,
   },
-  chipText: {
+  chipTextOutline: {
     color: THEME.primary,
     fontWeight: "900",
     fontSize: 12,
@@ -697,13 +1015,22 @@ const styles = StyleSheet.create({
   },
 
   /* Suggestions */
+  suggestionsWrapper: {
+    position: "relative",
+    zIndex: 1000,
+  },
   suggestionsContainer: {
-    maxHeight: 220,
+    maxHeight: 280,
     backgroundColor: "#2D313A",
     borderRadius: 16,
     marginTop: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   suggestionItem: {
     flexDirection: "row",
@@ -734,5 +1061,244 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.6)",
     fontSize: 12,
     fontWeight: "700",
+  },
+
+  /* Active Ride Blocker */
+  activeRideContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  activeRideIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(94,198,198,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+  },
+  activeRideTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  activeRideStatus: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#5EC6C6",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  activeRideDetails: {
+    width: "100%",
+    backgroundColor: "#252B35",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+  },
+  activeRideRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  activeRideDivider: {
+    width: 2,
+    height: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    marginLeft: 8,
+    marginVertical: 8,
+  },
+  activeRideText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  trackRideBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    width: "100%",
+    backgroundColor: "#5EC6C6",
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  trackRideBtnText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0f1a19",
+  },
+  cancelRideBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    width: "100%",
+    backgroundColor: "rgba(255,82,82,0.15)",
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,82,82,0.3)",
+  },
+  cancelRideBtnText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#FF5252",
+  },
+  backHomeBtn: {
+    paddingVertical: 12,
+  },
+  backHomeBtnText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.6)",
+  },
+
+  /* Driver Card Styles */
+  driverCard: {
+    width: "100%",
+    backgroundColor: "#252B35",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(94,198,198,0.2)",
+  },
+  driverCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  driverAvatarContainer: {
+    position: "relative",
+  },
+  driverAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(94,198,198,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  driverOnlineIndicator: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#4CAF50",
+    borderWidth: 2,
+    borderColor: "#252B35",
+  },
+  driverInfo: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  driverName: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#fff",
+    marginBottom: 4,
+  },
+  driverRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  driverRating: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#FFC107",
+  },
+  driverTrips: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.5)",
+    marginLeft: 4,
+  },
+  driverActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  driverActionBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(94,198,198,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  vehicleInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    marginBottom: 14,
+  },
+  vehicleText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#9AA4B2",
+  },
+  etaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(94,198,198,0.12)",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  etaBadgeText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#5EC6C6",
+  },
+
+  /* Floating Navigation */
+  floatingNav: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    backgroundColor: "#23272F",
+    borderTopWidth: 0,
+    height: Platform.OS === "ios" ? 88 : 72,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 24 : 12,
+    marginHorizontal: 12,
+    marginBottom: Platform.OS === "ios" ? 20 : 12,
+    borderRadius: 24,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  floatingNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    paddingVertical: 6,
+  },
+  floatingNavLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.65)",
+    marginTop: 4,
   },
 });

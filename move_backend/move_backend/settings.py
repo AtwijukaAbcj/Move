@@ -61,10 +61,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'channels',
     'service_category',
     'service_provider',
     'provider_service',
     'corporate',
+    'wallet',
 ]
 
 MIDDLEWARE = [
@@ -94,6 +96,14 @@ TEMPLATES = [
     },
 ]
 
+
+# Channels
+ASGI_APPLICATION = 'move_backend.asgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 WSGI_APPLICATION = 'move_backend.wsgi.application'
 
 
@@ -104,6 +114,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,  # Wait up to 30 seconds for database locks
+        },
     }
 }
 

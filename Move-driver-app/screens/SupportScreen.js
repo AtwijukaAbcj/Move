@@ -1,5 +1,19 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  TextInput, 
+  Alert, 
+  ActivityIndicator,
+  Platform,
+  Linking,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function SupportScreen() {
   const [selectedTopic, setSelectedTopic] = useState(null);
@@ -7,11 +21,11 @@ export default function SupportScreen() {
   const [sending, setSending] = useState(false);
 
   const topics = [
-    { id: 1, icon: "🚗", title: "Trip Issues", description: "Problems with a specific trip" },
-    { id: 2, icon: "💰", title: "Payment & Earnings", description: "Questions about payments" },
-    { id: 3, icon: "📄", title: "Document Verification", description: "Help with document upload" },
-    { id: 4, icon: "⚙️", title: "Account Settings", description: "Profile and preferences" },
-    { id: 5, icon: "❓", title: "General Help", description: "Other questions" },
+    { id: 1, icon: "car-outline", title: "Trip Issues", description: "Problems with a specific trip", color: "#5EC6C6" },
+    { id: 2, icon: "cash-outline", title: "Payment & Earnings", description: "Questions about payments", color: "#10b981" },
+    { id: 3, icon: "document-text-outline", title: "Document Verification", description: "Help with document upload", color: "#60a5fa" },
+    { id: 4, icon: "settings-outline", title: "Account Settings", description: "Profile and preferences", color: "#a78bfa" },
+    { id: 5, icon: "help-circle-outline", title: "General Help", description: "Other questions", color: "#fbbf24" },
   ];
 
   const handleSubmit = async () => {
@@ -25,7 +39,6 @@ export default function SupportScreen() {
     }
 
     setSending(true);
-    // Simulate API call
     setTimeout(() => {
       setSending(false);
       Alert.alert("Request Sent", "Our support team will contact you soon");
@@ -35,188 +48,429 @@ export default function SupportScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ padding: 18, paddingBottom: 28 }}>
-      <Text style={styles.title}>Support Center</Text>
-      <Text style={styles.subtitle}>We're here to help you</Text>
-
-      {/* Quick Contact */}
-      <View style={styles.contactCard}>
-        <Text style={styles.contactTitle}>Need immediate help?</Text>
-        <View style={styles.contactRow}>
-          <TouchableOpacity style={styles.contactBtn} activeOpacity={0.85}>
-            <Text style={styles.contactIcon}>📞</Text>
-            <Text style={styles.contactText}>Call Us</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.contactBtn} activeOpacity={0.85}>
-            <Text style={styles.contactIcon}>💬</Text>
-            <Text style={styles.contactText}>Live Chat</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.contactBtn} activeOpacity={0.85}>
-            <Text style={styles.contactIcon}>✉️</Text>
-            <Text style={styles.contactText}>Email</Text>
-          </TouchableOpacity>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Support Center</Text>
+          <Text style={styles.subtitle}>We're here to help you</Text>
         </View>
-      </View>
 
-      {/* Topics */}
-      <Text style={styles.sectionTitle}>Select a Topic</Text>
-      {topics.map((topic) => (
+        {/* Quick Contact */}
+        <LinearGradient
+          colors={['#1e3a5f', '#152238']}
+          style={styles.contactCard}
+        >
+          <View style={styles.contactHeader}>
+            <View style={styles.contactIcon}>
+              <Ionicons name="headset" size={24} color="#5EC6C6" />
+            </View>
+            <View>
+              <Text style={styles.contactTitle}>Need immediate help?</Text>
+              <Text style={styles.contactSubtitle}>Our team is available 24/7</Text>
+            </View>
+          </View>
+          
+          <View style={styles.contactRow}>
+            <TouchableOpacity 
+              style={styles.contactBtn} 
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL('tel:+1234567890')}
+            >
+              <LinearGradient
+                colors={['#5EC6C6', '#4BA8A8']}
+                style={styles.contactBtnGradient}
+              >
+                <Ionicons name="call" size={20} color="#0a0f1a" />
+                <Text style={styles.contactBtnText}>Call Us</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.contactBtn} 
+              activeOpacity={0.85}
+              onPress={() => Linking.openURL('mailto:support@move.com')}
+            >
+              <View style={styles.contactBtnOutline}>
+                <Ionicons name="mail" size={20} color="#5EC6C6" />
+                <Text style={styles.contactBtnTextOutline}>Email</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+
+        {/* Topics Section */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionIcon}>
+            <Ionicons name="chatbubbles" size={16} color="#fbbf24" />
+          </View>
+          <Text style={styles.sectionTitle}>How can we help?</Text>
+        </View>
+
+        {/* Topic Buttons */}
+        {topics.map((topic) => (
+          <TouchableOpacity
+            key={topic.id}
+            activeOpacity={0.85}
+            onPress={() => setSelectedTopic(topic.id)}
+          >
+            <LinearGradient
+              colors={selectedTopic === topic.id ? ['#1e3a5f', '#152238'] : ['#1a2744', '#0f1a2e']}
+              style={[
+                styles.topicCard,
+                selectedTopic === topic.id && styles.topicCardSelected,
+              ]}
+            >
+              <View style={[styles.topicIcon, { backgroundColor: `${topic.color}15` }]}>
+                <Ionicons name={topic.icon} size={22} color={topic.color} />
+              </View>
+              <View style={styles.topicContent}>
+                <Text style={styles.topicTitle}>{topic.title}</Text>
+                <Text style={styles.topicDesc}>{topic.description}</Text>
+              </View>
+              <View style={[
+                styles.checkCircle,
+                selectedTopic === topic.id && styles.checkCircleSelected
+              ]}>
+                {selectedTopic === topic.id && (
+                  <Ionicons name="checkmark" size={14} color="#0a0f1a" />
+                )}
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        ))}
+
+        {/* Message Input */}
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionIcon, { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
+            <Ionicons name="create" size={16} color="#60a5fa" />
+          </View>
+          <Text style={styles.sectionTitle}>Describe your issue</Text>
+        </View>
+
+        <LinearGradient
+          colors={['#1a2744', '#0f1a2e']}
+          style={styles.messageCard}
+        >
+          <TextInput
+            style={styles.textArea}
+            placeholder="Tell us more about your issue..."
+            placeholderTextColor="#6b7280"
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+          />
+        </LinearGradient>
+
+        {/* Submit Button */}
         <TouchableOpacity
-          key={topic.id}
-          style={[styles.topicCard, selectedTopic === topic.id && styles.topicCardActive]}
-          onPress={() => setSelectedTopic(topic.id)}
+          style={[styles.submitBtn, sending && styles.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={sending}
           activeOpacity={0.85}
         >
-          <Text style={styles.topicIcon}>{topic.icon}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.topicTitle}>{topic.title}</Text>
-            <Text style={styles.topicDescription}>{topic.description}</Text>
-          </View>
-          {selectedTopic === topic.id && (
-            <View style={styles.checkmark}>
-              <Text style={styles.checkmarkText}>✓</Text>
-            </View>
-          )}
+          <LinearGradient
+            colors={sending ? ['#4a5568', '#2d3748'] : ['#5EC6C6', '#4BA8A8']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.submitBtnGradient}
+          >
+            {sending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="send" size={18} color="#0a0f1a" />
+                <Text style={styles.submitBtnText}>Submit Request</Text>
+              </>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
-      ))}
 
-      {/* Message Input */}
-      <Text style={styles.sectionTitle}>Describe Your Issue</Text>
-      <TextInput
-        value={message}
-        onChangeText={setMessage}
-        placeholder="Tell us how we can help..."
-        placeholderTextColor="#5a6477"
-        multiline
-        numberOfLines={6}
-        style={styles.textArea}
-        textAlignVertical="top"
-      />
+        {/* FAQ Section */}
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionIcon, { backgroundColor: 'rgba(167, 139, 250, 0.15)' }]}>
+            <Ionicons name="help" size={16} color="#a78bfa" />
+          </View>
+          <Text style={styles.sectionTitle}>Frequently Asked</Text>
+        </View>
 
-      {/* Submit Button */}
-      <TouchableOpacity
-        style={[styles.submitBtn, (!selectedTopic || !message.trim() || sending) && styles.submitBtnDisabled]}
-        onPress={handleSubmit}
-        disabled={!selectedTopic || !message.trim() || sending}
-        activeOpacity={0.85}
-      >
-        {sending ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.submitBtnText}>Submit Request</Text>
-        )}
-      </TouchableOpacity>
-
-      {/* FAQ */}
-      <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-      <View style={styles.faqCard}>
-        <Text style={styles.faqQuestion}>How do I get approved as a driver?</Text>
-        <Text style={styles.faqAnswer}>Upload all required documents and wait for admin review (usually 1-2 business days).</Text>
-      </View>
-
-      <View style={styles.faqCard}>
-        <Text style={styles.faqQuestion}>When do I get paid?</Text>
-        <Text style={styles.faqAnswer}>Payouts are processed every Monday for the previous week's earnings.</Text>
-      </View>
-
-      <View style={styles.faqCard}>
-        <Text style={styles.faqQuestion}>How do I go online to receive requests?</Text>
-        <Text style={styles.faqAnswer}>From the Dashboard, tap the 'GO ONLINE' button after you're approved.</Text>
-      </View>
-    </ScrollView>
+        <LinearGradient
+          colors={['#1a2744', '#0f1a2e']}
+          style={styles.faqCard}
+        >
+          <TouchableOpacity style={styles.faqItem} activeOpacity={0.8}>
+            <Text style={styles.faqQuestion}>How do I update my documents?</Text>
+            <Ionicons name="chevron-forward" size={18} color="#6b7280" />
+          </TouchableOpacity>
+          <View style={styles.faqDivider} />
+          <TouchableOpacity style={styles.faqItem} activeOpacity={0.8}>
+            <Text style={styles.faqQuestion}>When do I get paid?</Text>
+            <Ionicons name="chevron-forward" size={18} color="#6b7280" />
+          </TouchableOpacity>
+          <View style={styles.faqDivider} />
+          <TouchableOpacity style={styles.faqItem} activeOpacity={0.8}>
+            <Text style={styles.faqQuestion}>How to change my vehicle?</Text>
+            <Ionicons name="chevron-forward" size={18} color="#6b7280" />
+          </TouchableOpacity>
+        </LinearGradient>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0b1220" },
+  screen: { flex: 1, backgroundColor: "#0a0f1a" },
   
-  title: { color: "#fff", fontSize: 28, fontWeight: "900", marginBottom: 6 },
-  subtitle: { color: "#aeb9cc", fontSize: 14, fontWeight: "600", marginBottom: 16 },
+  header: {
+    marginBottom: 20,
+  },
+  title: { 
+    color: "#fff", 
+    fontSize: 32, 
+    fontWeight: "900", 
+    marginBottom: 6 
+  },
+  subtitle: { 
+    color: "#6b7280", 
+    fontSize: 15, 
+    fontWeight: "600" 
+  },
 
   contactCard: {
-    backgroundColor: "#121b2e",
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#5EC6C6',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 18,
   },
-  contactTitle: { color: "#fff", fontWeight: "900", fontSize: 16, marginBottom: 14 },
-  contactRow: { flexDirection: "row", gap: 10 },
-  contactBtn: {
-    flex: 1,
-    backgroundColor: "#0f1627",
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#24314d",
+  contactIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(94, 198, 198, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
   },
-  contactIcon: { fontSize: 24, marginBottom: 6 },
-  contactText: { color: "#fff", fontWeight: "800", fontSize: 11 },
+  contactTitle: { 
+    color: "#fff", 
+    fontWeight: "900", 
+    fontSize: 16 
+  },
+  contactSubtitle: {
+    color: "#6b7280",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  contactRow: { 
+    flexDirection: "row", 
+    gap: 12 
+  },
+  contactBtn: { 
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  contactBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  contactBtnText: { 
+    color: "#0a0f1a", 
+    fontWeight: "900",
+    fontSize: 14,
+  },
+  contactBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(94, 198, 198, 0.4)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(94, 198, 198, 0.1)',
+  },
+  contactBtnTextOutline: {
+    color: "#5EC6C6",
+    fontWeight: "900",
+    fontSize: 14,
+  },
 
-  sectionTitle: { color: "#fff", fontWeight: "900", fontSize: 18, marginBottom: 12, marginTop: 6 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    marginTop: 8,
+  },
+  sectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(251, 191, 36, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  sectionTitle: { 
+    color: "#fff", 
+    fontWeight: "900", 
+    fontSize: 18 
+  },
 
   topicCard: {
-    backgroundColor: "#121b2e",
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
     marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  topicCardActive: {
-    backgroundColor: "rgba(47, 102, 255, 0.12)",
-    borderColor: "#2f66ff",
+  topicCardSelected: {
+    borderColor: '#5EC6C6',
+    borderWidth: 2,
   },
-  topicIcon: { fontSize: 28 },
-  topicTitle: { color: "#fff", fontWeight: "900", fontSize: 15, marginBottom: 4 },
-  topicDescription: { color: "#aeb9cc", fontWeight: "600", fontSize: 12 },
-  checkmark: {
+  topicIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  topicContent: {
+    flex: 1,
+  },
+  topicTitle: { 
+    color: "#fff", 
+    fontWeight: "800", 
+    fontSize: 15 
+  },
+  topicDesc: { 
+    color: "#6b7280", 
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  checkCircle: {
     width: 24,
     height: 24,
-    borderRadius: 999,
-    backgroundColor: "#2f66ff",
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  checkmarkText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  checkCircleSelected: {
+    backgroundColor: '#5EC6C6',
+    borderColor: '#5EC6C6',
+  },
 
+  messageCard: {
+    borderRadius: 16,
+    marginBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
   textArea: {
-    backgroundColor: "#121b2e",
-    borderRadius: 14,
-    padding: 14,
+    padding: 16,
     color: "#fff",
-    borderWidth: 1,
-    borderColor: "#24314d",
+    fontSize: 15,
     fontWeight: "600",
     minHeight: 120,
-    marginBottom: 16,
   },
 
   submitBtn: {
-    backgroundColor: "#2f66ff",
-    paddingVertical: 16,
     borderRadius: 14,
-    alignItems: "center",
-    marginBottom: 24,
+    overflow: 'hidden',
+    marginBottom: 28,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#5EC6C6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+  submitBtnDisabled: {
+    opacity: 0.7,
+  },
+  submitBtnGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  submitBtnText: {
+    color: "#0a0f1a",
+    fontWeight: "900",
+    fontSize: 16,
+  },
 
   faqCard: {
-    backgroundColor: "#121b2e",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    marginBottom: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  faqQuestion: { color: "#fff", fontWeight: "900", fontSize: 14, marginBottom: 8 },
-  faqAnswer: { color: "#aeb9cc", fontWeight: "600", fontSize: 13, lineHeight: 20 },
+  faqItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  faqQuestion: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  faqDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    marginHorizontal: 16,
+  },
 });

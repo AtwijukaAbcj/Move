@@ -7,11 +7,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   return (
     <Provider store={store}>
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: '#0b1220' }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? -65 : 0}
       >
-        {children}
+        <View style={{ flex: 1 }}>
+          {children}
+        </View>
       </KeyboardAvoidingView>
     </Provider>
   );

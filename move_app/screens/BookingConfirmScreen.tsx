@@ -31,6 +31,13 @@ export default function BookingConfirmScreen() {
   const pickup = params.pickup as string || "Pick up location";
   const destination = params.destination as string || "Destination";
   const rideType = params.selectedRide as string || "standard";
+  const rideId = params.rideId as string | undefined;
+  const pickupLat = params.pickupLat as string || "";
+  const pickupLng = params.pickupLng as string || "";
+  const destLat = params.destLat as string || "";
+  const destLng = params.destLng as string || "";
+  const { token } = useAuth();
+  const [driver, setDriver] = useState<any>(null);
   
   const [estimatedFare, setEstimatedFare] = useState(0);
   const [distance, setDistance] = useState("0");
@@ -49,16 +56,35 @@ export default function BookingConfirmScreen() {
         setContactPhone(user.phone);
       }
     }
-    
     // Calculate estimated fare based on ride type
     const baseFares = { standard: 15, xl: 25, premium: 35 };
     const fare = baseFares[rideType as keyof typeof baseFares] || 15;
     setEstimatedFare(fare + Math.random() * 10); // Add random amount for variation
-    
     // Mock distance and duration
     setDistance((3 + Math.random() * 7).toFixed(1));
     setDuration((10 + Math.random() * 20).toFixed(0));
-  }, [rideType, user]);
+
+    // Fetch assigned driver info if rideId is present
+    const fetchDriver = async () => {
+      if (!rideId || !token) return;
+      try {
+        const response = await fetch(`http://192.168.1.31:8000/provider_service/ride-status/${rideId}/`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Token ${token}`,
+          },
+        });
+        const data = await response.json();
+        if (data.driver) {
+          setDriver(data.driver);
+        }
+      } catch (e) {
+        console.log("Error fetching driver info", e);
+      }
+    };
+    fetchDriver();
+  }, [rideType, user, rideId, token]);
 
   const getRideInfo = () => {
     const rides = {
@@ -88,20 +114,20 @@ export default function BookingConfirmScreen() {
           <MapView
             style={styles.map}
             initialRegion={{
-              latitude: 6.5244,
-              longitude: 3.3792,
+              latitude: 40.7128,
+              longitude: -74.0060,
               latitudeDelta: 0.05,
               longitudeDelta: 0.05,
             }}
             scrollEnabled={false}
             zoomEnabled={false}
           >
-            <Marker coordinate={{ latitude: 6.5244, longitude: 3.3792 }} pinColor="#5EC6C6" />
-            <Marker coordinate={{ latitude: 6.5344, longitude: 3.3892 }} pinColor="#FFA726" />
+            <Marker coordinate={{ latitude: 40.7128, longitude: -74.0060 }} pinColor="#5EC6C6" />
+            <Marker coordinate={{ latitude: 40.7228, longitude: -73.9960 }} pinColor="#FFA726" />
             <Polyline
               coordinates={[
-                { latitude: 6.5244, longitude: 3.3792 },
-                { latitude: 6.5344, longitude: 3.3892 },
+                { latitude: 40.7128, longitude: -74.0060 },
+                { latitude: 40.7228, longitude: -73.9960 },
               ]}
               strokeColor={THEME.aqua}
               strokeWidth={3}
@@ -151,6 +177,18 @@ export default function BookingConfirmScreen() {
               <Text style={styles.priceValue}>{estimatedFare.toFixed(2)}</Text>
             </View>
           </View>
+          {/* Assigned Driver Info */}
+          {driver && (
+            <View style={{ marginTop: 16 }}>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Assigned Driver</Text>
+              <Text style={{ color: '#9AA4B2', fontWeight: '700', fontSize: 14 }}>Name: {driver.full_name || driver.name}</Text>
+              <Text style={{ color: '#9AA4B2', fontWeight: '700', fontSize: 14 }}>Phone: {driver.phone}</Text>
+              <Text style={{ color: '#9AA4B2', fontWeight: '700', fontSize: 14 }}>Vehicle: {driver.vehicle_info || 'N/A'}</Text>
+              <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 16, marginTop: 4, alignSelf: 'flex-start', backgroundColor: '#23272F', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 }}>
+                Plate: {driver.vehicle_number || 'MOV-0000'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Price Breakdown */}
@@ -216,7 +254,11 @@ export default function BookingConfirmScreen() {
                 fare: estimatedFare.toFixed(2),
                 distance,
                 duration,
-                contactPhone
+                contactPhone,
+                pickupLat,
+                pickupLng,
+                destLat,
+                destLng,
               }
             });
           }}
@@ -370,25 +412,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 8,
   },
-  breakdownValue: { color: "#fff", fontSize: 14, fontWeight: "800" },
-
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    marginVertical: 12,
-  },
-
-  totalRow: { flexDirection: "row", justifyContent: "space-between" },
-  totalLabel: { color: "#fff", fontSize: 16, fontWeight: "900" },
-  totalValue: { color: THEME.aqua, fontSize: 20, fontWeight: "900" },
-
-  paymentPromptRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  paymentPromptTitle: { color: "#fff", fontSize: 15, fontWeight: "800", marginBottom: 2 },
-  paymentPromptSub: { color: "#9AA4B2", fontSize: 13, fontWeight: "700" },
+  // Removed duplicate style keys below to fix compile errors
+  // breakdownValue, divider, totalRow, totalLabel, totalValue, paymentPromptRow, paymentPromptTitle, paymentPromptSub
 
   footer: {
     padding: 16,

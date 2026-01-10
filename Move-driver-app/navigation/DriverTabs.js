@@ -1,4 +1,5 @@
 import React from "react";
+import { View, Platform } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import DashboardScreen from "../screens/DashboardScreen";
@@ -13,37 +14,49 @@ const Tab = createBottomTabNavigator();
 export default function DriverTabs() {
   return (
     <Tab.Navigator 
-      initialRouteName="Dashboard"
+      initialRouteName="Home"
       screenOptions={{
-        tabBarActiveTintColor: "#2f66ff",
-        tabBarInactiveTintColor: "#8B95A5",
+        headerShown: false,
+        tabBarActiveTintColor: "#5EC6C6",
+        tabBarInactiveTintColor: "#6b7280",
         tabBarStyle: {
-          backgroundColor: "#121b2e",
-          borderTopColor: "#24314d",
-          borderTopWidth: 1,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 65,
+          position: 'absolute',
+          bottom: 16,
+          left: 16,
+          right: 16,
+          backgroundColor: "#0f1627",
+          borderRadius: 24,
+          borderTopWidth: 0,
+          paddingBottom: 0,
+          paddingTop: 0,
+          height: 70,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.4,
+              shadowRadius: 16,
+            },
+            android: {
+              elevation: 12,
+            },
+          }),
+        },
+        tabBarItemStyle: {
+          paddingVertical: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: "700",
-        },
-        headerStyle: {
-          backgroundColor: "#0b1220",
-          borderBottomColor: "#24314d",
-          borderBottomWidth: 1,
-        },
-        headerTintColor: "#fff",
-        headerTitleStyle: {
-          fontWeight: "900",
+          marginTop: 2,
         },
       }}
     >
       <Tab.Screen 
-        name="Dashboard" 
+        name="Home" 
         component={DashboardScreen}
         options={{
+          tabBarLabel: "Home",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),

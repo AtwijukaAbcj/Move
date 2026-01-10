@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { startBookingStatusPolling, stopBookingStatusPolling } from "../utils/bookingStatusPoller";
 
 type User = any;
 
@@ -39,6 +40,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
+
+  // Start polling for booking status changes when user is logged in
+  useEffect(() => {
+    if (user) {
+      console.log('User logged in, starting booking status polling...');
+      startBookingStatusPolling();
+    } else {
+      console.log('User logged out, stopping booking status polling...');
+      stopBookingStatusPolling();
+    }
+
+    return () => {
+      stopBookingStatusPolling();
+    };
+  }, [user]);
 
   const login = async (payload: any) => {
     const t =

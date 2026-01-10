@@ -28,7 +28,7 @@ export default function OtpVerificationScreen({ route, navigation }) {
       });
       const data = await res.json();
       if (res.ok && data.verified) {
-        navigation.replace("Dashboard");
+        navigation.replace("DashboardMain");
       } else {
         Alert.alert("Verification failed", data.error || "Please try again.");
       }

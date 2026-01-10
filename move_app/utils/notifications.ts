@@ -20,8 +20,12 @@ export const addNotification = async (
   data?: any
 ): Promise<void> => {
   try {
+    console.log('addNotification called with:', { customerId, title, type });
+    
     const notificationsKey = `notifications_${customerId}`;
     const storedNotifications = await AsyncStorage.getItem(notificationsKey);
+    
+    console.log('Existing notifications:', storedNotifications ? 'found' : 'none');
     
     const notifications: Notification[] = storedNotifications 
       ? JSON.parse(storedNotifications) 
@@ -37,12 +41,16 @@ export const addNotification = async (
       data,
     };
 
+    console.log('Creating notification:', newNotification);
+
     notifications.unshift(newNotification); // Add to beginning
 
     // Keep only last 50 notifications
     const trimmedNotifications = notifications.slice(0, 50);
 
     await AsyncStorage.setItem(notificationsKey, JSON.stringify(trimmedNotifications));
+    
+    console.log('Notification saved successfully. Total count:', trimmedNotifications.length);
   } catch (error) {
     console.error('Error adding notification:', error);
   }

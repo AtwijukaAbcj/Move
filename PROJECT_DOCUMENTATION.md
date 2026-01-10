@@ -563,7 +563,7 @@ Response: 200 OK
 ```
 DEBUG=True
 SECRET_KEY=your-secret-key
-ALLOWED_HOSTS=localhost,127.0.0.1,your-ip
+ALLOWED_HOSTS=localhost,192.168.1.31,your-ip
 DATABASE_URL=sqlite:///db.sqlite3
 
 # Email Configuration

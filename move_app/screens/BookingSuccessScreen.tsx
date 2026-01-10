@@ -7,6 +7,8 @@ import {
   ScrollView,
   Platform,
   ActivityIndicator,
+  Linking,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -25,22 +27,101 @@ export default function BookingSuccessScreen() {
 
   const [driverStatus, setDriverStatus] = useState<"searching" | "found">("searching");
   const [driver, setDriver] = useState<any>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    // Simulate driver matching
-    const timer = setTimeout(() => {
-      setDriverStatus("found");
-      setDriver({
-        name: "John Smith",
-        rating: 4.8,
-        vehicle: "Toyota Camry",
-        licensePlate: "GH-1234-20",
-        eta: "3 mins",
-      });
+    const bookingId = params.bookingId;
+    if (!bookingId) {
+      // No booking ID, use simulated data as fallback
+      const timer = setTimeout(() => {
+        setDriverStatus("found");
+        setDriver({
+          name: "John Smith",
+          rating: 4.8,
+          vehicle: "Toyota Camry",
+          licensePlate: "GH-1234-20",
+          eta: "3 mins",
+        });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+
+    // Poll for driver assignment
+    const pollForDriver = async () => {
+      try {
+        // First, try to assign a driver if not already assigned
+        const assignResponse = await fetch(
+          `http://192.168.1.31:8000/api/corporate/bookings/${bookingId}/assign-driver/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+        const assignData = await assignResponse.json();
+        console.log("Driver assignment poll:", assignData);
+
+        if (assignResponse.ok && assignData.driver_id) {
+          // Driver found and assigned!
+          setDriverStatus("found");
+          setDriver({
+            id: assignData.driver_id,
+            name: assignData.driver_name || "Your Driver",
+            phone: assignData.driver_phone,
+            rating: 4.8,
+            vehicle: assignData.vehicle_type || "Standard Vehicle",
+            licensePlate: "---",
+            eta: `${Math.ceil(assignData.distance || 2)} mins`,
+            distance: assignData.distance,
+          });
+          return true; // Stop polling
+        }
+        
+        // Check booking status
+        const statusResponse = await fetch(
+          `http://192.168.1.31:8000/api/corporate/bookings/${bookingId}/`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+        
+        if (statusResponse.ok) {
+          const bookingData = await statusResponse.json();
+          if (bookingData.driver && bookingData.status === "driver_assigned") {
+            setDriverStatus("found");
+            setDriver({
+              id: bookingData.driver,
+              name: bookingData.driver_name || "Your Driver",
+              rating: 4.8,
+              vehicle: "Standard Vehicle",
+              licensePlate: "---",
+              eta: "3 mins",
+            });
+            return true;
+          }
+        }
+        
+        return false; // Continue polling
+      } catch (error) {
+        console.log("Error polling for driver:", error);
+        return false;
+      }
+    };
+
+    // Initial check
+    pollForDriver();
+
+    // Poll every 5 seconds for up to 2 minutes
+    const interval = setInterval(async () => {
+      setRetryCount((prev) => prev + 1);
+      const found = await pollForDriver();
+      if (found || retryCount >= 24) {
+        clearInterval(interval);
+      }
     }, 5000);
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => clearInterval(interval);
+  }, [params.bookingId]);
 
   return (
     <View style={styles.container}>
@@ -152,19 +233,40 @@ export default function BookingSuccessScreen() {
                 <Text style={styles.vehicleLabel}>Vehicle</Text>
                 <Text style={styles.vehicleValue}>{driver?.vehicle}</Text>
               </View>
-              <View>
-                <Text style={styles.plateLabel}>Plate Number</Text>
-                <Text style={styles.plateValue}>{driver?.licensePlate}</Text>
+              <View style={{ marginLeft: 8, backgroundColor: '#FFD700', borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#23272F', fontWeight: 'bold', fontSize: 16, letterSpacing: 2 }}>
+                  {driver?.vehicle_number || driver?.licensePlate || 'MOV-0000'}
+                </Text>
               </View>
             </View>
 
             <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.callBtn} activeOpacity={0.9}>
+              <TouchableOpacity 
+                style={styles.callBtn} 
+                activeOpacity={0.9}
+                onPress={() => {
+                  if (driver?.phone) {
+                    Linking.openURL(`tel:${driver.phone}`);
+                  } else {
+                    Alert.alert("Unable to Call", "Driver phone number not available");
+                  }
+                }}
+              >
                 <Ionicons name="call" size={20} color="#fff" />
                 <Text style={styles.callBtnText}>Call Driver</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.messageBtn} activeOpacity={0.9}>
+              <TouchableOpacity 
+                style={styles.messageBtn} 
+                activeOpacity={0.9}
+                onPress={() => router.push({
+                  pathname: "/chat",
+                  params: {
+                    bookingId: params.bookingId || "1",
+                    driverName: driver?.name || "Driver"
+                  }
+                })}
+              >
                 <Ionicons name="chatbubble" size={20} color={THEME.aqua} />
                 <Text style={styles.messageBtnText}>Message</Text>
               </TouchableOpacity>
@@ -203,7 +305,10 @@ export default function BookingSuccessScreen() {
         <TouchableOpacity
           style={styles.trackBtn}
           activeOpacity={0.9}
-          onPress={() => router.push("/rides")}
+          onPress={() => router.push({
+            pathname: "/ride-tracking",
+            params: { rideId: params.bookingId }
+          })}
         >
           <Ionicons name="navigate" size={20} color={THEME.ink} />
           <Text style={styles.trackBtnText}>Track Your Ride</Text>

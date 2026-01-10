@@ -1,383 +1,650 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, Alert } from "react-native";
-import { getToken } from "../utils/storage";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+  Platform,
+  Image,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons";
+import { getToken, deleteToken } from "../utils/storage";
+
+const API_BASE = "http://192.168.1.31:8000";
 
 export default function ProfileScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState(null);
-  const [editing, setEditing] = useState(false);
-  
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [vehicleType, setVehicleType] = useState("");
-
-  const API_BASE = "http://192.168.1.31:8000";
-
-  const fetchProfile = async () => {
-    try {
-      const userId = await getToken("userId");
-      if (!userId) {
-        navigation.replace("Login");
-        return;
-      }
-
-      const res = await fetch(`${API_BASE}/api/corporate/driver/${userId}/profile/`);
-      if (res.ok) {
-        const data = await res.json();
-        setProfile(data);
-        setFullName(data.full_name || "");
-        setPhone(data.phone || "");
-        setEmail(data.email || "");
-        setVehicleType(data.vehicle_type || "");
-      }
-    } catch (e) {
-      console.log("Error fetching profile:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [driver, setDriver] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    vehicle_number: "",
+    vehicle_type: "",
+    status: "active",
+    rating: 4.8,
+    total_trips: 0,
+  });
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
-  const handleSave = async () => {
-    if (!fullName.trim()) {
-      Alert.alert("Error", "Full name is required");
-      return;
+  const fetchProfile = async () => {
+    try {
+      const driverId = await getToken("userId");
+      const storedName = await getToken("driverName");
+      const storedEmail = await getToken("driverEmail");
+      const storedPhone = await getToken("driverPhone");
+      const storedVehicle = await getToken("vehicleNumber");
+      
+      if (!driverId) {
+        navigation.replace("Login");
+        return;
+      }
+      const res = await fetch(`${API_BASE}/api/corporate/driver/${driverId}/`);
+      if (res.ok) {
+        const data = await res.json();
+        setDriver({
+          ...data,
+          name: data.full_name || data.name || storedName || "",
+          email: data.email || storedEmail || "",
+          phone: data.phone || storedPhone || "",
+          vehicle_number: data.vehicle_number || storedVehicle || "",
+        });
+      } else {
+        // Use stored data if API fails
+        setDriver(prev => ({ 
+          ...prev, 
+          name: storedName || prev.name,
+          email: storedEmail || prev.email,
+          phone: storedPhone || prev.phone,
+          vehicle_number: storedVehicle || prev.vehicle_number,
+        }));
+      }
+    } catch (e) {
+      console.log("Profile fetch error:", e);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  const handleSave = async () => {
     setSaving(true);
     try {
-      const userId = await getToken("userId");
-      const res = await fetch(`${API_BASE}/api/corporate/driver/${userId}/profile/`, {
+      const driverId = await getToken("userId");
+      const res = await fetch(`${API_BASE}/api/corporate/driver/${driverId}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: fullName,
-          phone: phone,
-          email: email,
-          vehicle_type: vehicleType,
+          name: driver.name,
+          phone: driver.phone,
+          vehicle_number: driver.vehicle_number,
         }),
       });
-
       if (res.ok) {
         Alert.alert("Success", "Profile updated successfully");
-        setEditing(false);
-        fetchProfile();
       } else {
         Alert.alert("Error", "Failed to update profile");
       }
     } catch (e) {
-      Alert.alert("Error", "Failed to update profile");
+      Alert.alert("Error", "Network error");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCancel = () => {
-    setFullName(profile?.full_name || "");
-    setPhone(profile?.phone || "");
-    setEmail(profile?.email || "");
-    setVehicleType(profile?.vehicle_type || "");
-    setEditing(false);
+  const handleLogout = async () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          await deleteToken("userId");
+          await deleteToken("driverName");
+          navigation.replace("Login");
+        },
+      },
+    ]);
   };
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2f66ff" />
-      </View>
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <View style={styles.loadingScreen}>
+          <ActivityIndicator size="large" color="#5EC6C6" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ padding: 18, paddingBottom: 28 }}>
-      <Text style={styles.title}>Driver Profile</Text>
-      <Text style={styles.subtitle}>Manage your personal information</Text>
-
-      {/* Profile Card */}
-      <View style={styles.card}>
-        {/* Status Badge */}
-        <View style={styles.statusBadge}>
-          <View style={[styles.statusDot, { backgroundColor: profile?.is_approved ? "#5EC6C6" : "#f9c404" }]} />
-          <Text style={styles.statusText}>
-            {profile?.is_approved ? "Verified Driver" : "Pending Approval"}
-          </Text>
-        </View>
-
-        {/* Form Fields */}
-        <Text style={styles.label}>Full Name</Text>
-        <TextInput
-          value={fullName}
-          onChangeText={setFullName}
-          placeholder="Enter your full name"
-          placeholderTextColor="#5a6477"
-          style={[styles.input, !editing && styles.inputDisabled]}
-          editable={editing}
-        />
-
-        <Text style={styles.label}>Phone Number</Text>
-        <TextInput
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="Enter phone number"
-          placeholderTextColor="#5a6477"
-          keyboardType="phone-pad"
-          style={[styles.input, !editing && styles.inputDisabled]}
-          editable={editing}
-        />
-
-        <Text style={styles.label}>Email Address</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Enter email"
-          placeholderTextColor="#5a6477"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={[styles.input, !editing && styles.inputDisabled]}
-          editable={editing}
-        />
-
-        <Text style={styles.label}>Vehicle Type</Text>
-        <TextInput
-          value={vehicleType}
-          onChangeText={setVehicleType}
-          placeholder="e.g. Car, Motorcycle, Truck"
-          placeholderTextColor="#5a6477"
-          style={[styles.input, !editing && styles.inputDisabled]}
-          editable={editing}
-        />
-
-        {/* Action Buttons */}
-        {!editing ? (
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => setEditing(true)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.editBtnText}>Edit Profile</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.btn, styles.cancelBtn]}
-              onPress={handleCancel}
-              activeOpacity={0.85}
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* Avatar Section */}
+        <LinearGradient
+          colors={['#1e3a5f', '#0a0f1a']}
+          style={styles.avatarSection}
+        >
+          <View style={styles.avatarContainer}>
+            <LinearGradient
+              colors={['#5EC6C6', '#4BA8A8']}
+              style={styles.avatarRing}
             >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+              <View style={styles.avatarInner}>
+                <FontAwesome5 name="user-alt" size={40} color="#5EC6C6" />
+              </View>
+            </LinearGradient>
+            <TouchableOpacity style={styles.cameraBtn} activeOpacity={0.85}>
+              <Ionicons name="camera" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.driverName}>{driver.name || "Driver"}</Text>
+          
+          <View style={styles.statusBadge}>
+            <View style={[
+              styles.statusDot, 
+              { backgroundColor: driver.status === "active" ? "#10b981" : "#f59e0b" }
+            ]} />
+            <Text style={styles.statusText}>
+              {driver.status === "active" ? "Active" : "Inactive"}
+            </Text>
+          </View>
+
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="star" size={20} color="#fbbf24" />
+              <Text style={styles.statValue}>{driver.rating || "4.8"}</Text>
+              <Text style={styles.statLabel}>Rating</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="car-sport" size={20} color="#60a5fa" />
+              <Text style={styles.statValue}>{driver.total_trips || "0"}</Text>
+              <Text style={styles.statLabel}>Trips</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="calendar" size={20} color="#a78bfa" />
+              <Text style={styles.statValue}>2024</Text>
+              <Text style={styles.statLabel}>Joined</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Personal Info Section */}
+        <View style={styles.content}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIcon}>
+              <Ionicons name="person" size={16} color="#5EC6C6" />
+            </View>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+          </View>
+
+          <LinearGradient
+            colors={['#1a2744', '#0f1a2e']}
+            style={styles.formCard}
+          >
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color="#6b7280" />
+                <TextInput
+                  style={styles.input}
+                  value={driver.name}
+                  onChangeText={(val) => setDriver({ ...driver, name: val })}
+                  placeholder="Your full name"
+                  placeholderTextColor="#4b5563"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email Address</Text>
+              <View style={[styles.inputContainer, styles.inputDisabled]}>
+                <Ionicons name="mail-outline" size={18} color="#6b7280" />
+                <TextInput
+                  style={styles.input}
+                  value={driver.email}
+                  editable={false}
+                  placeholder="Email address"
+                  placeholderTextColor="#4b5563"
+                />
+                <Ionicons name="lock-closed" size={14} color="#6b7280" />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="call-outline" size={18} color="#6b7280" />
+                <TextInput
+                  style={styles.input}
+                  value={driver.phone}
+                  onChangeText={(val) => setDriver({ ...driver, phone: val })}
+                  placeholder="Phone number"
+                  placeholderTextColor="#4b5563"
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Vehicle Info Section */}
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIcon, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+              <Ionicons name="car" size={16} color="#fbbf24" />
+            </View>
+            <Text style={styles.sectionTitle}>Vehicle Information</Text>
+          </View>
+
+          <LinearGradient
+            colors={['#1a2744', '#0f1a2e']}
+            style={styles.formCard}
+          >
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Vehicle Type</Text>
+              <View style={[styles.inputContainer, styles.inputDisabled]}>
+                <MaterialCommunityIcons name="car-side" size={18} color="#6b7280" />
+                <TextInput
+                  style={styles.input}
+                  value={driver.vehicle_type || "Standard"}
+                  editable={false}
+                  placeholder="Vehicle type"
+                  placeholderTextColor="#4b5563"
+                />
+                <Ionicons name="lock-closed" size={14} color="#6b7280" />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Vehicle Number</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="document-text-outline" size={18} color="#6b7280" />
+                <TextInput
+                  style={styles.input}
+                  value={driver.vehicle_number}
+                  onChangeText={(val) => setDriver({ ...driver, vehicle_number: val })}
+                  placeholder="License plate number"
+                  placeholderTextColor="#4b5563"
+                  autoCapitalize="characters"
+                />
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Quick Actions */}
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIcon, { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
+              <Ionicons name="flash" size={16} color="#60a5fa" />
+            </View>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+          </View>
+
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={styles.actionCard} activeOpacity={0.85}>
+              <LinearGradient
+                colors={['#1a2744', '#0f1a2e']}
+                style={styles.actionCardGradient}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: 'rgba(167, 139, 250, 0.15)' }]}>
+                  <Ionicons name="document" size={22} color="#a78bfa" />
+                </View>
+                <Text style={styles.actionText}>Documents</Text>
+              </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.btn, styles.saveBtn, saving && styles.saveBtnDisabled]}
-              onPress={handleSave}
-              disabled={saving}
+            <TouchableOpacity style={styles.actionCard} activeOpacity={0.85}>
+              <LinearGradient
+                colors={['#1a2744', '#0f1a2e']}
+                style={styles.actionCardGradient}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+                  <Ionicons name="shield-checkmark" size={22} color="#10b981" />
+                </View>
+                <Text style={styles.actionText}>Verification</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionCard} 
               activeOpacity={0.85}
+              onPress={() => navigation.navigate("Settings")}
+            >
+              <LinearGradient
+                colors={['#1a2744', '#0f1a2e']}
+                style={styles.actionCardGradient}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+                  <Ionicons name="settings" size={22} color="#fbbf24" />
+                </View>
+                <Text style={styles.actionText}>Settings</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* Save Button */}
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={saving ? ['#4a5568', '#2d3748'] : ['#5EC6C6', '#4BA8A8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.saveBtnGradient}
             >
               {saving ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.saveBtnText}>Save Changes</Text>
+                <>
+                  <Ionicons name="save" size={18} color="#0a0f1a" />
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                </>
               )}
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+            </LinearGradient>
+          </TouchableOpacity>
 
-      {/* Info Card */}
-      <View style={styles.infoCard}>
-        <Text style={styles.infoLabel}>Member Since</Text>
-        <Text style={styles.infoValue}>
-          {profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString() : "N/A"}
-        </Text>
-      </View>
-
-      {/* Quick Actions */}
-      <Text style={styles.sectionTitle}>Quick Actions</Text>
-      
-      <TouchableOpacity
-        style={styles.actionBtn}
-        onPress={() => navigation.navigate("DocumentUpload")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.actionBtnText}>📄 Manage Documents</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.actionBtn}
-        onPress={() => navigation.navigate("Support")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.actionBtnText}>💬 Contact Support</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.actionBtn, styles.logoutBtn]}
-        onPress={() => navigation.replace("Login")}
-        activeOpacity={0.85}
-      >
-        <Text style={[styles.actionBtnText, styles.logoutText]}>🚪 Log Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          {/* Logout Button */}
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={handleLogout}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0b1220" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0b1220" },
-  
-  title: { color: "#fff", fontSize: 28, fontWeight: "900", marginBottom: 6 },
-  subtitle: { color: "#aeb9cc", fontSize: 14, fontWeight: "600", marginBottom: 16 },
-
-  card: {
-    backgroundColor: "#121b2e",
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    marginBottom: 16,
+  screen: { flex: 1, backgroundColor: "#0a0f1a" },
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: "#0a0f1a",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
+  avatarSection: {
+    alignItems: "center",
+    paddingTop: 40,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  avatarContainer: {
+    position: "relative",
+    marginBottom: 16,
+  },
+  avatarRing: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    padding: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#5EC6C6',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  avatarInner: {
+    flex: 1,
+    borderRadius: 51,
+    backgroundColor: '#0a0f1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraBtn: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#5EC6C6",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 3,
+    borderColor: "#0a0f1a",
+  },
+  driverName: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(94, 198, 198, 0.12)",
-    paddingVertical: 8,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
     paddingHorizontal: 14,
-    borderRadius: 999,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: "rgba(94, 198, 198, 0.25)",
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 20,
   },
   statusDot: {
     width: 8,
     height: 8,
-    borderRadius: 999,
+    borderRadius: 4,
     marginRight: 8,
   },
   statusText: {
-    color: "#5EC6C6",
-    fontWeight: "800",
+    color: "#10b981",
+    fontWeight: "700",
     fontSize: 13,
   },
 
-  label: {
-    color: "#aeb9cc",
-    fontWeight: "800",
-    fontSize: 13,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#0f1627",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: "#fff",
-    borderWidth: 1,
-    borderColor: "#24314d",
-    fontWeight: "600",
-  },
-  inputDisabled: {
-    opacity: 0.7,
-    backgroundColor: "#0a0f1a",
-  },
-
-  editBtn: {
-    marginTop: 18,
-    backgroundColor: "#2f66ff",
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  editBtnText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 15,
-  },
-
-  buttonRow: {
+  statsRow: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 18,
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginHorizontal: 20,
   },
-  btn: {
+  statItem: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
     alignItems: "center",
   },
-  cancelBtn: {
-    backgroundColor: "#2a3553",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  cancelBtnText: {
+  statValue: {
     color: "#fff",
+    fontSize: 20,
     fontWeight: "900",
-    fontSize: 15,
+    marginTop: 6,
   },
-  saveBtn: {
-    backgroundColor: "#5EC6C6",
-  },
-  saveBtnDisabled: {
-    opacity: 0.6,
-  },
-  saveBtnText: {
-    color: "#0b1220",
-    fontWeight: "900",
-    fontSize: 15,
-  },
-
-  infoCard: {
-    backgroundColor: "#121b2e",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    marginBottom: 16,
-  },
-  infoLabel: {
-    color: "#aeb9cc",
-    fontWeight: "800",
+  statLabel: {
+    color: "#6b7280",
     fontSize: 12,
-    marginBottom: 6,
+    fontWeight: "600",
+    marginTop: 2,
   },
-  infoValue: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 16,
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "rgba(255,255,255,0.1)",
   },
 
+  content: {
+    padding: 20,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    marginTop: 10,
+  },
+  sectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(94, 198, 198, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
   sectionTitle: {
     color: "#fff",
     fontWeight: "900",
     fontSize: 18,
-    marginBottom: 12,
   },
 
-  actionBtn: {
-    backgroundColor: "#121b2e",
-    borderRadius: 14,
+  formCard: {
+    borderRadius: 16,
     padding: 16,
+    marginBottom: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    color: "#9ca3af",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  inputDisabled: {
+    opacity: 0.6,
+  },
+  input: {
+    flex: 1,
+    color: "#fff",
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+  },
+  actionCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  actionCardGradient: {
+    alignItems: "center",
+    paddingVertical: 18,
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 10,
   },
-  actionBtnText: {
+  actionText: {
     color: "#fff",
-    fontWeight: "800",
-    fontSize: 15,
+    fontWeight: "700",
+    fontSize: 12,
   },
+
+  saveBtn: {
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#5EC6C6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  saveBtnDisabled: {
+    opacity: 0.7,
+  },
+  saveBtnGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    gap: 10,
+  },
+  saveBtnText: {
+    color: "#0a0f1a",
+    fontWeight: "900",
+    fontSize: 16,
+  },
+
   logoutBtn: {
-    backgroundColor: "rgba(255, 59, 48, 0.12)",
-    borderColor: "rgba(255, 59, 48, 0.25)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    borderRadius: 14,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.3)",
+    gap: 8,
   },
   logoutText: {
-    color: "#ff3b30",
+    color: "#ef4444",
+    fontWeight: "800",
+    fontSize: 15,
   },
 });

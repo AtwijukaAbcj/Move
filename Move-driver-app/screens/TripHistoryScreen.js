@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, RefreshControl, TouchableOpacity } from "react-native";
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ActivityIndicator, 
+  ScrollView, 
+  RefreshControl,
+  TouchableOpacity,
+  Platform,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { getToken } from "../utils/storage";
 
 export default function TripHistoryScreen() {
@@ -38,136 +50,351 @@ export default function TripHistoryScreen() {
     setRefreshing(false);
   };
 
+  const getStatusColor = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'completed': return '#10b981';
+      case 'cancelled': return '#ef4444';
+      case 'in_progress': return '#fbbf24';
+      default: return '#5EC6C6';
+    }
+  };
+
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2f66ff" />
-      </View>
+      <SafeAreaView style={styles.screen} edges={['top']}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#5EC6C6" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ padding: 18, paddingBottom: 28 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2f66ff" />}
-    >
-      <Text style={styles.title}>Trip History</Text>
-      <Text style={styles.subtitle}>View all your completed trips</Text>
-
-      {trips.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🚗</Text>
-          <Text style={styles.emptyTitle}>No trips yet</Text>
-          <Text style={styles.emptyText}>Your completed trips will appear here</Text>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#5EC6C6" />}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Trip History</Text>
+          <Text style={styles.subtitle}>View all your completed trips</Text>
         </View>
-      ) : (
-        trips.map((trip, index) => (
-          <TouchableOpacity key={trip.id || index} style={styles.tripCard} activeOpacity={0.9}>
-            <View style={styles.tripHeader}>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>{trip.status || "Completed"}</Text>
-              </View>
-              <Text style={styles.tripDate}>{trip.date || "Today"}</Text>
-            </View>
 
-            <View style={styles.tripRoute}>
-              <View style={styles.routePoint}>
-                <View style={[styles.routeDot, { backgroundColor: "#5EC6C6" }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.routeLabel}>Pickup</Text>
-                  <Text style={styles.routeValue}>{trip.pickup || "N/A"}</Text>
+        {/* Stats Summary */}
+        <View style={styles.statsRow}>
+          <LinearGradient
+            colors={['#1a2744', '#0f1a2e']}
+            style={styles.statCard}
+          >
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
+              <Ionicons name="checkmark-circle" size={18} color="#10b981" />
+            </View>
+            <Text style={styles.statValue}>{trips.length}</Text>
+            <Text style={styles.statLabel}>Total Trips</Text>
+          </LinearGradient>
+
+          <LinearGradient
+            colors={['#1a2744', '#0f1a2e']}
+            style={styles.statCard}
+          >
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(96, 165, 250, 0.15)' }]}>
+              <Ionicons name="star" size={18} color="#60a5fa" />
+            </View>
+            <Text style={styles.statValue}>4.9</Text>
+            <Text style={styles.statLabel}>Avg Rating</Text>
+          </LinearGradient>
+        </View>
+
+        {/* Trips List */}
+        {trips.length === 0 ? (
+          <LinearGradient
+            colors={['#1a2744', '#0f1a2e']}
+            style={styles.emptyState}
+          >
+            <View style={styles.emptyIconContainer}>
+              <MaterialCommunityIcons name="car-outline" size={48} color="#6b7280" />
+            </View>
+            <Text style={styles.emptyTitle}>No Trips Yet</Text>
+            <Text style={styles.emptyText}>Your completed trips will appear here</Text>
+          </LinearGradient>
+        ) : (
+          trips.map((trip, index) => (
+            <TouchableOpacity 
+              key={trip.id || index} 
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={['#1a2744', '#0f1a2e']}
+                style={styles.tripCard}
+              >
+                {/* Trip Header */}
+                <View style={styles.tripHeader}>
+                  <View style={[
+                    styles.statusBadge,
+                    { backgroundColor: `${getStatusColor(trip.status)}15` }
+                  ]}>
+                    <View style={[styles.statusDot, { backgroundColor: getStatusColor(trip.status) }]} />
+                    <Text style={[styles.statusText, { color: getStatusColor(trip.status) }]}>
+                      {trip.status || "Completed"}
+                    </Text>
+                  </View>
+                  <Text style={styles.tripDate}>{trip.date || "Today"}</Text>
                 </View>
-              </View>
 
-              <View style={styles.routeLine} />
+                {/* Trip Route */}
+                <View style={styles.tripRoute}>
+                  <View style={styles.routePoint}>
+                    <View style={styles.routeIconContainer}>
+                      <View style={[styles.routeDot, { backgroundColor: "#5EC6C6" }]} />
+                      <View style={styles.routeLineVertical} />
+                    </View>
+                    <View style={styles.routeContent}>
+                      <Text style={styles.routeLabel}>PICKUP</Text>
+                      <Text style={styles.routeValue}>{trip.pickup || "N/A"}</Text>
+                    </View>
+                  </View>
 
-              <View style={styles.routePoint}>
-                <View style={[styles.routeDot, { backgroundColor: "#2f66ff" }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.routeLabel}>Destination</Text>
-                  <Text style={styles.routeValue}>{trip.destination || "N/A"}</Text>
+                  <View style={styles.routePoint}>
+                    <View style={styles.routeIconContainer}>
+                      <View style={[styles.routeDot, { backgroundColor: "#2f66ff" }]} />
+                    </View>
+                    <View style={styles.routeContent}>
+                      <Text style={styles.routeLabel}>DROPOFF</Text>
+                      <Text style={styles.routeValue}>{trip.destination || "N/A"}</Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
-            </View>
 
-            <View style={styles.tripFooter}>
-              <Text style={styles.fareText}>Fare: {trip.fare || "$0.00"}</Text>
-              <Text style={styles.durationText}>{trip.duration || "0 min"}</Text>
-            </View>
-          </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
+                {/* Trip Footer */}
+                <View style={styles.tripFooter}>
+                  <View style={styles.tripDetail}>
+                    <Ionicons name="cash-outline" size={16} color="#10b981" />
+                    <Text style={styles.fareText}>{trip.fare || "$0.00"}</Text>
+                  </View>
+                  <View style={styles.tripDetail}>
+                    <Ionicons name="time-outline" size={16} color="#6b7280" />
+                    <Text style={styles.durationText}>{trip.duration || "0 min"}</Text>
+                  </View>
+                  <View style={styles.tripDetail}>
+                    <Ionicons name="navigate-outline" size={16} color="#6b7280" />
+                    <Text style={styles.durationText}>{trip.distance || "0 km"}</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0b1220" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0b1220" },
+  screen: { flex: 1, backgroundColor: "#0a0f1a" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0a0f1a" },
   
-  title: { color: "#fff", fontSize: 28, fontWeight: "900", marginBottom: 6 },
-  subtitle: { color: "#aeb9cc", fontSize: 14, fontWeight: "600", marginBottom: 16 },
+  header: {
+    marginBottom: 20,
+  },
+  title: { 
+    color: "#fff", 
+    fontSize: 32, 
+    fontWeight: "900", 
+    marginBottom: 6 
+  },
+  subtitle: { 
+    color: "#6b7280", 
+    fontSize: 15, 
+    fontWeight: "600" 
+  },
+
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 18,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  statValue: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginBottom: 2,
+  },
+  statLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: "600",
+  },
 
   emptyState: {
-    backgroundColor: "#121b2e",
-    borderRadius: 18,
-    padding: 32,
+    borderRadius: 24,
+    padding: 48,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    marginTop: 32,
+    marginTop: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { color: "#fff", fontWeight: "900", fontSize: 18, marginBottom: 8 },
-  emptyText: { color: "#aeb9cc", fontWeight: "600", textAlign: "center" },
+  emptyIconContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: { 
+    color: "#fff", 
+    fontWeight: "900", 
+    fontSize: 20, 
+    marginBottom: 8 
+  },
+  emptyText: { 
+    color: "#6b7280", 
+    fontWeight: "600", 
+    textAlign: "center",
+    fontSize: 14,
+  },
 
   tripCard: {
-    backgroundColor: "#121b2e",
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   tripHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 16,
   },
   statusBadge: {
-    backgroundColor: "rgba(94, 198, 198, 0.12)",
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(94, 198, 198, 0.25)",
+    borderRadius: 20,
+    gap: 6,
   },
-  statusText: { color: "#5EC6C6", fontWeight: "800", fontSize: 12 },
-  tripDate: { color: "#aeb9cc", fontWeight: "800", fontSize: 12 },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: { 
+    fontWeight: "800", 
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  tripDate: { 
+    color: "#6b7280", 
+    fontWeight: "700", 
+    fontSize: 12 
+  },
 
-  tripRoute: { marginBottom: 14 },
-  routePoint: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  routeDot: { width: 12, height: 12, borderRadius: 999, marginTop: 4 },
-  routeLabel: { color: "#aeb9cc", fontWeight: "800", fontSize: 11, marginBottom: 4 },
-  routeValue: { color: "#fff", fontWeight: "800", fontSize: 14 },
-  routeLine: {
+  tripRoute: { 
+    marginBottom: 16,
+  },
+  routePoint: { 
+    flexDirection: "row", 
+  },
+  routeIconContainer: {
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  routeDot: { 
+    width: 14, 
+    height: 14, 
+    borderRadius: 7,
+  },
+  routeLineVertical: {
     width: 2,
-    height: 20,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    marginLeft: 5,
-    marginVertical: 4,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  routeContent: {
+    flex: 1,
+    paddingBottom: 16,
+  },
+  routeLabel: { 
+    color: "#6b7280", 
+    fontWeight: "800", 
+    fontSize: 10,
+    letterSpacing: 1,
+    marginBottom: 4 
+  },
+  routeValue: { 
+    color: "#fff", 
+    fontWeight: "700", 
+    fontSize: 14,
+    lineHeight: 20,
   },
 
   tripFooter: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 12,
+    paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
+    borderTopColor: "rgba(255,255,255,0.08)",
+    gap: 20,
   },
-  fareText: { color: "#5EC6C6", fontWeight: "900", fontSize: 16 },
-  durationText: { color: "#aeb9cc", fontWeight: "800", fontSize: 13 },
+  tripDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fareText: { 
+    color: "#10b981", 
+    fontWeight: "900", 
+    fontSize: 16 
+  },
+  durationText: { 
+    color: "#9ca3af", 
+    fontWeight: "700", 
+    fontSize: 13 
+  },
 });

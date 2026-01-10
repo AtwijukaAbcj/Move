@@ -39,57 +39,104 @@ export default function NotificationsScreen() {
   const loadNotifications = async () => {
     try {
       const customerId = await AsyncStorage.getItem("customerId");
+      console.log('Loading notifications for customerId:', customerId);
+      
       if (!customerId) {
+        console.log('No customerId found, cannot load notifications');
         setLoading(false);
         return;
       }
 
-      const notificationsKey = `notifications_${customerId}`;
-      const storedNotifications = await AsyncStorage.getItem(notificationsKey);
-      
-      if (storedNotifications) {
-        const parsed = JSON.parse(storedNotifications);
-        // Sort by timestamp, newest first
-        parsed.sort((a: Notification, b: Notification) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setNotifications(parsed);
+      // Fetch latest bookings and service bookings from backend
+      const BASE_URL = "http://192.168.1.31:8000";
+      let notifications: Notification[] = [];
+
+      // Fetch ride bookings
+      const ridesResponse = await fetch(`${BASE_URL}/api/corporate/customer/${customerId}/bookings/`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (ridesResponse.ok) {
+        const ridesData = await ridesResponse.json();
+        ridesData.forEach((item: any) => {
+          notifications.push({
+            id: `ride_${item.id}`,
+            title: `Ride Booked! 🚗`,
+            message: `Your ${item.ride_type || 'ride'} from ${item.pickup_location} to ${item.destination} is ${item.status.replace('_', ' ')}.`,
+            type: 'ride',
+            timestamp: item.created_at,
+            read: false,
+            data: { bookingId: item.id, status: item.status, ...item }
+          });
+        });
       }
+
+      // Fetch service bookings
+      const servicesResponse = await fetch(`${BASE_URL}/api/corporate/customer/${customerId}/service-bookings/`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (servicesResponse.ok) {
+        const servicesData = await servicesResponse.json();
+        servicesData.forEach((item: any) => {
+          notifications.push({
+            id: `service_${item.id}`,
+            title: `Service Booked! 📅`,
+            message: `Your booking for "${item.service_title || item.provider_service_title || 'service'}" on ${item.date} is ${item.status.replace('_', ' ')}.`,
+            type: 'service',
+            timestamp: item.created_at,
+            read: false,
+            data: { bookingId: item.id, status: item.status, ...item }
+          });
+        });
+      }
+
+      // Only show notifications for accepted and status changes
+      const allowedStatuses = ['confirmed', 'in_progress', 'completed', 'cancelled', 'driver_assigned', 'driver_arrived', 'picked_up'];
+      const filtered = notifications.filter((notif: Notification) => {
+        return notif.data && notif.data.status && allowedStatuses.includes(notif.data.status);
+      });
+      filtered.sort((a: Notification, b: Notification) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+      setNotifications(filtered);
     } catch (error) {
-      console.error("Error loading notifications:", error);
+      console.error('Error loading notifications:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const markAsRead = async (notificationId: string) => {
+  const markAsRead = async (id: string) => {
     try {
+      const updatedNotifications = notifications.map((notif) => {
+        if (notif.id === id) {
+          return { ...notif, read: true };
+        }
+        return notif;
+      });
+      setNotifications(updatedNotifications);
+
       const customerId = await AsyncStorage.getItem("customerId");
       if (!customerId) return;
-
-      const updatedNotifications = notifications.map(notif =>
-        notif.id === notificationId ? { ...notif, read: true } : notif
-      );
-
-      setNotifications(updatedNotifications);
 
       const notificationsKey = `notifications_${customerId}`;
       await AsyncStorage.setItem(notificationsKey, JSON.stringify(updatedNotifications));
     } catch (error) {
-      console.error("Error marking notification as read:", error);
+      console.error('Error marking notification as read:', error);
     }
   };
 
   const clearAll = async () => {
     try {
+      setNotifications([]);
       const customerId = await AsyncStorage.getItem("customerId");
       if (!customerId) return;
 
       const notificationsKey = `notifications_${customerId}`;
       await AsyncStorage.removeItem(notificationsKey);
-      setNotifications([]);
     } catch (error) {
-      console.error("Error clearing notifications:", error);
+      console.error('Error clearing notifications:', error);
     }
   };
 
@@ -97,7 +144,7 @@ export default function NotificationsScreen() {
     switch (type) {
       case 'booking': return 'calendar-outline';
       case 'ride': return 'car-outline';
-      case 'service': return 'briefcase-outline';
+      case 'service': return 'construct-outline';
       default: return 'notifications-outline';
     }
   };
@@ -135,7 +182,16 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Stack.Screen options={{ title: 'Notifications', headerShown: true }} />
+      <Stack.Screen 
+        options={{ 
+          title: 'Notifications', 
+          headerShown: true,
+          headerBackTitle: 'Back',
+          headerStyle: { backgroundColor: '#1A1F26' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: '900' },
+        }} 
+      />
       <View style={styles.container}>
         {notifications.length > 0 && (
           <TouchableOpacity style={styles.clearButton} onPress={clearAll}>
@@ -180,6 +236,12 @@ export default function NotificationsScreen() {
                     {!item.read && <View style={styles.unreadDot} />}
                   </View>
                   <Text style={styles.message}>{item.message}</Text>
+                  {/* Always show booking status if available */}
+                  {item.data && item.data.status && (
+                    <Text style={{ color: '#FFA726', fontSize: 13, fontWeight: '800', marginTop: 4 }}>
+                      Status: {item.data.status.charAt(0).toUpperCase() + item.data.status.slice(1).replace('_', ' ')}
+                    </Text>
+                  )}
                   <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
                 </View>
               </TouchableOpacity>

@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/providers/', include('service_provider.urls')),
     path('api/provider-services/', include('provider_service.urls')),
     path('api/corporate/', include('corporate.urls')),
+    path('api/wallet/', include('wallet.urls')),
 ]
 
 if settings.DEBUG:

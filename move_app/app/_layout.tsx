@@ -9,6 +9,7 @@ import "react-native-get-random-values";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import Layout from "@/components/Layout";
 import { AuthProvider, useAuth } from "./auth-context"; // ✅ updated path
+import RideTrackingScreen from "../screens/RideTrackingScreen";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -38,6 +39,8 @@ function MainStack() {
           <>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="map" />
+            <Stack.Screen name="chat" options={{ title: "Chat" }} />
+            <Stack.Screen name="ride-tracking" options={{ title: "Track Ride" }} />
             <Stack.Screen name="+not-found" />
           </>
         )}

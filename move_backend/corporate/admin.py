@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Advert, Driver, Customer, User, Booking, ServiceBooking
+from .models import Advert, Driver, Customer, User, Booking, ServiceBooking, RideOffer
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
@@ -45,3 +45,12 @@ class ServiceBookingAdmin(admin.ModelAdmin):
     search_fields = ('customer__full_name', 'provider_service__title', 'phone')
     date_hierarchy = 'created_at'
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(RideOffer)
+class RideOfferAdmin(admin.ModelAdmin):
+    list_display = ('id', 'booking', 'driver', 'status', 'offer_order', 'distance_km', 'offered_at', 'expires_at')
+    list_filter = ('status', 'offered_at')
+    search_fields = ('booking__id', 'driver__full_name')
+    date_hierarchy = 'offered_at'
+    readonly_fields = ('offered_at', 'responded_at', 'seconds_remaining')

@@ -128,7 +128,7 @@ export default function ActivityScreen() {
           <FlatList
             data={displayData}
             keyExtractor={item => item.id.toString()}
-            contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -173,8 +173,8 @@ export default function ActivityScreen() {
                   {item.number_of_cars && item.total_passengers && (
                     <View style={styles.vehicleInfo}>
                       <Text style={styles.vehicleText}>
-                        🚗 {item.number_of_cars} car{item.number_of_cars > 1 ? 's' : ''} • 
-                        👥 {item.total_passengers} passenger{item.total_passengers > 1 ? 's' : ''}
+                        {item.number_of_cars} car{item.number_of_cars > 1 ? 's' : ''} • 
+                        {item.total_passengers} passenger{item.total_passengers > 1 ? 's' : ''}
                       </Text>
                     </View>
                   )}
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 6 },
   details: { color: '#B0BEC5', marginTop: 4, fontSize: 14, lineHeight: 20 },
   vehicleInfo: {
-    backgroundColor: 'rgba(94, 198, 198, 0.15)',
+    backgroundColor: 'rgba(94, 198, 198, 0.09)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,

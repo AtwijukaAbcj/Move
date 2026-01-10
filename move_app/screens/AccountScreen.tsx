@@ -122,6 +122,9 @@ export default function AccountScreen() {
   const userEmail = user?.email || 'alex.johnson@email.com';
   const userInitials = userName ? userName.split(' ').map((n: string) => n[0]).join('') : 'U';
 
+  // Example balance, should be synced with WalletScreen in a real app
+  const [balance] = useState(2500);
+
   return (
     <View style={styles.container}>
       <View style={styles.profileCard}>
@@ -159,6 +162,25 @@ export default function AccountScreen() {
           <Text style={styles.editBtnText}>Edit Profile</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Credit Balance Section */}
+      <View style={styles.creditSection}>
+        <View style={styles.creditBalanceRow}>
+          <MaterialIcons name="account-balance-wallet" size={28} color="#5EC6C6" style={{ marginRight: 12 }} />
+          <View>
+            <Text style={styles.creditLabel}>Credit Balance</Text>
+            <Text style={styles.creditAmount}>₦{balance.toLocaleString()}</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.addCreditBtn}
+          onPress={() => router.push("/wallet")}
+          activeOpacity={0.85}
+        >
+          <MaterialIcons name="add-circle" size={20} color="#fff" />
+          <Text style={styles.addCreditBtnText}>Add More Credit</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.sectionRow}>
@@ -188,6 +210,50 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
+  creditSection: {
+    backgroundColor: '#2D313A',
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 28,
+    width: '88%',
+    alignSelf: 'center',
+    alignItems: 'center',
+    shadowColor: '#222',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+  },
+  creditBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  creditLabel: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+    marginBottom: 2,
+  },
+  creditAmount: {
+    color: '#5EC6C6',
+    fontWeight: '900',
+    fontSize: 22,
+  },
+  addCreditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#5EC6C6',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  addCreditBtnText: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 15,
+    marginLeft: 8,
+  },
   avatarTouchable: {
     width: 80,
     height: 80,

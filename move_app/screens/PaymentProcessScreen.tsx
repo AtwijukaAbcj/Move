@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { addNotification } from "../utils/notifications";
+import { trackBooking } from "../utils/bookingStatusPoller";
 
 const THEME = {
   primary: "#35736E",
@@ -56,7 +57,7 @@ export default function PaymentProcessScreen() {
         return;
       }
 
-      const bookingData = {
+      const bookingData: any = {
         customer: parseInt(customerId),
         pickup_location: params.pickup,
         destination: params.destination,
@@ -68,6 +69,17 @@ export default function PaymentProcessScreen() {
         status: "pending",
         contact_phone: params.contactPhone as string || "",
       };
+
+      // Add coordinates if available (required for driver assignment)
+      // Round to 7 decimal places to avoid floating point precision issues
+      if (params.pickupLat && params.pickupLng) {
+        bookingData.pickup_latitude = Math.round(parseFloat(params.pickupLat as string) * 10000000) / 10000000;
+        bookingData.pickup_longitude = Math.round(parseFloat(params.pickupLng as string) * 10000000) / 10000000;
+      }
+      if (params.destLat && params.destLng) {
+        bookingData.destination_latitude = Math.round(parseFloat(params.destLat as string) * 10000000) / 10000000;
+        bookingData.destination_longitude = Math.round(parseFloat(params.destLng as string) * 10000000) / 10000000;
+      }
 
       console.log("Creating booking with data:", bookingData);
 
@@ -83,18 +95,109 @@ export default function PaymentProcessScreen() {
       console.log("Booking response:", responseData);
 
       if (response.ok) {
-        const booking = responseData;
+        let booking = responseData;
+        
+        // Automatically assign nearest available driver
+        try {
+          console.log("Assigning nearest driver for booking:", booking.id);
+          const assignResponse = await fetch(
+            `http://192.168.1.31:8000/api/corporate/bookings/${booking.id}/assign-driver/`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          const assignData = await assignResponse.json();
+          console.log("Driver assignment response:", assignData);
+          
+          if (assignResponse.ok && assignData.driver_id) {
+            // Update booking with driver info
+            booking = { ...booking, ...assignData, status: assignData.status };
+            console.log("Driver assigned:", assignData.driver_name);
+          } else if (assignResponse.status === 202) {
+            // No drivers available, booking is in searching_driver status
+            booking.status = 'searching_driver';
+            console.log("No drivers available, will keep searching");
+          }
+        } catch (assignError) {
+          console.log("Error assigning driver (will continue):", assignError);
+        }
+        
         setStatus("success");
         
-        // Add notification for successful booking
+        // Create notification based on booking status
         if (customerId) {
+          console.log('Creating notification for booking:', booking.id, 'Status:', booking.status);
+          
+          // Define status-specific notification details
+          const statusMessages: Record<string, { title: string; message: string }> = {
+            pending: { 
+              title: 'Ride Booked! 🚗', 
+              message: `Your ${params.rideType || 'ride'} booking is being processed. We're finding you a driver.` 
+            },
+            searching_driver: { 
+              title: 'Finding Driver... 🔍', 
+              message: `Searching for a driver for your ${params.rideType || 'ride'} from ${params.pickup}.` 
+            },
+            confirmed: { 
+              title: 'Ride Confirmed! ✅', 
+              message: `Your ${params.rideType || 'ride'} from ${params.pickup} to ${params.destination} is confirmed.` 
+            },
+            driver_assigned: { 
+              title: 'Driver Assigned! 👋', 
+              message: `A driver has been assigned to your ${params.rideType || 'ride'}. They're on their way!` 
+            },
+            driver_arrived: { 
+              title: 'Driver Arrived! 📍', 
+              message: `Your driver has arrived at ${params.pickup}.` 
+            },
+            picked_up: { 
+              title: 'Trip Started! 🚀', 
+              message: `You've been picked up. Enjoy your ride to ${params.destination}!` 
+            },
+            in_progress: { 
+              title: 'Trip In Progress 🛣️', 
+              message: `Your ride to ${params.destination} is in progress.` 
+            },
+            completed: { 
+              title: 'Trip Completed! ✅', 
+              message: `You've arrived at ${params.destination}. Thank you for riding with Move!` 
+            },
+          };
+          
+          const statusInfo = statusMessages[booking.status] || {
+            title: 'Booking Created! 🎉',
+            message: `Your ${params.rideType || 'ride'} booking has been created.`
+          };
+          
+          // Create notification for all bookings
           await addNotification(
             customerId,
-            'Ride Booked Successfully! 🚗',
-            `Your ${params.rideType || 'ride'} from ${params.pickup} to ${params.destination} has been confirmed. Fare: $${params.fare}`,
+            statusInfo.title,
+            statusInfo.message,
             'ride',
-            { bookingId: booking.id, rideType: params.rideType }
+            { bookingId: booking.id, rideType: params.rideType, status: booking.status }
           );
+          console.log('Notification created successfully');
+          
+          // Track pending bookings for status updates
+          if (booking.status === 'pending' || booking.status === 'searching_driver') {
+            await trackBooking(
+              customerId,
+              booking.id,
+              booking.status,
+              'ride',
+              {
+                rideType: params.rideType,
+                pickup: params.pickup,
+                destination: params.destination,
+                fare: params.fare
+              }
+            );
+            console.log('Booking tracked for future status updates');
+          }
         }
         
         // Track order history and last visited

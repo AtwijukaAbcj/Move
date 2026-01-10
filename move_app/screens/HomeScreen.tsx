@@ -131,15 +131,42 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [shortcuts, setShortcuts] = useState<any[]>([]);
+  // Ongoing ride state
+  const [ongoingRide, setOngoingRide] = useState<any>(null);
   const [mostOrderedPlace, setMostOrderedPlace] = useState<any>(null);
   const [lastVisitedPlace, setLastVisitedPlace] = useState<any>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
+
   useEffect(() => {
     if (!user) router.replace("/login");
-    else loadProfilePicture();
+    else {
+      loadProfilePicture();
+      fetchOngoingRide();
+    }
   }, [user, router]);
+
+  // Fetch ongoing ride for the customer
+  const fetchOngoingRide = async () => {
+    try {
+      const customerId = await AsyncStorage.getItem("customerId");
+      if (!customerId) return;
+      const response = await fetch(`${BASE_URL}/api/corporate/customer/${customerId}/ongoing-ride/`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.status && data.status !== "completed" && data.status !== "cancelled") {
+          setOngoingRide(data);
+        } else {
+          setOngoingRide(null);
+        }
+      } else {
+        setOngoingRide(null);
+      }
+    } catch (error) {
+      setOngoingRide(null);
+    }
+  };
 
   useEffect(() => {
     loadShortcuts();
@@ -276,7 +303,7 @@ export default function HomeScreen() {
   const searchPlaces = async (query: string) => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=AIzaSyAEIJNjKs7Kxr5DstLl_Slzp5oCk8Ba2l0&components=country:ng`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=AIzaSyAEIJNjKs7Kxr5DstLl_Slzp5oCk8Ba2l0&components=country:us`
       );
       const data = await response.json();
       if (data.predictions) {
@@ -304,9 +331,36 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ScrollView
         style={styles.scrollContainer}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Ongoing Ride Card */}
+        {ongoingRide && (
+          <View style={{
+            backgroundColor: '#e6f7f7',
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            borderWidth: 1,
+            borderColor: '#5EC6C6',
+          }}>
+            <Ionicons name="car-sport" size={28} color="#5EC6C6" style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#0f1a19', fontWeight: '900', fontSize: 15, marginBottom: 2 }}>
+                Request accepted
+              </Text>
+              <Text style={{ color: '#35736E', fontWeight: '700', fontSize: 13 }}>
+                Driver on the way
+              </Text>
+              <Text style={{ color: '#35736E', fontWeight: '700', fontSize: 13 }}>
+                You have an ongoing ride
+              </Text>
+            </View>
+          </View>
+        )}
         {/* HEADER */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -351,7 +405,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push("/profile")}
+              onPress={() => router.push("/wallet")}
               style={styles.iconBtn}
               activeOpacity={0.85}
             >
@@ -577,57 +631,49 @@ export default function HomeScreen() {
         </View>
 
         {/* CTA */}
-        <View style={styles.ctaHeader}>
+        {/* <View style={styles.ctaHeader}>
           <Text style={styles.sectionTitle}>Choose an option</Text>
         </View>
 
         <View style={styles.ctaRow}>
           <TouchableOpacity
             activeOpacity={0.9}
-            style={[styles.ctaCard, styles.ctaPrimary]}
+            style={[styles.ctaCard, { shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 }]}
             onPress={() => router.push("/rides")}
           >
-            <View style={styles.ctaTopRow}>
-              <View style={styles.ctaIcon}>
-                <Ionicons name="car-sport" size={24} color="#0f1a19" />
+            <LinearGradient
+              colors={["#5EC6C6", "#4DB6AC"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.ctaGradient, { minHeight: 180, padding: 18, justifyContent: 'center' }]}
+            >
+              <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
+                <Ionicons name="car-sport" size={38} color="#35736E" />
               </View>
-              <View style={styles.ctaPill}>
-                <Text style={styles.ctaPillText}>FAST</Text>
-              </View>
-            </View>
-
-            <Text style={styles.ctaTitle}>Get a Ride</Text>
-            <Text style={styles.ctaSub}>Within your city • 2–5 min pickup</Text>
-
-            <View style={styles.ctaBottom}>
-              <Text style={styles.ctaGo}>Ride now</Text>
-              <Ionicons name="chevron-forward" size={18} color="#0f1a19" />
-            </View>
+              <Text style={[styles.ctaTitle, { textAlign: 'center', marginBottom: 4, fontSize: 20, color: '#fff' }]}>Get a Ride</Text>
+              <Text style={[styles.ctaSub, { textAlign: 'center', fontSize: 15, color: '#fff' }]}>Within your city • 2–5 min pickup</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.9}
-            style={[styles.ctaCard, styles.ctaSecondary]}
+            style={[styles.ctaCard, { shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 }]}
             onPress={() => router.push("/service")}
           >
-            <View style={styles.ctaTopRow}>
-              <View style={styles.ctaIcon}>
-                <Ionicons name="navigate" size={22} color="#0f1a19" />
+            <LinearGradient
+              colors={["#67D1C8", "#5EC6C6"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.ctaGradient, { minHeight: 180, padding: 18, justifyContent: 'center' }]}
+            >
+              <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
+                <Ionicons name="navigate" size={34} color="#35736E" />
               </View>
-              <View style={[styles.ctaPill, styles.ctaPillAlt]}>
-                <Text style={styles.ctaPillText}>SCHEDULE</Text>
-              </View>
-            </View>
-
-            <Text style={styles.ctaTitle}>Intercity</Text>
-            <Text style={styles.ctaSub}>Between cities • book ahead</Text>
-
-            <View style={styles.ctaBottom}>
-              <Text style={styles.ctaGo}>Plan trip</Text>
-              <Ionicons name="chevron-forward" size={18} color="#0f1a19" />
-            </View>
+              <Text style={[styles.ctaTitle, { textAlign: 'center', marginBottom: 4, fontSize: 20, color: '#fff' }]}>Intercity</Text>
+              <Text style={[styles.ctaSub, { textAlign: 'center', fontSize: 15, color: '#fff' }]}>Between cities • book ahead</Text>
+            </LinearGradient>
           </TouchableOpacity>
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );
@@ -970,17 +1016,12 @@ const styles = StyleSheet.create({
   adCard: {
     width: "90%",
     height: 240,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
     alignSelf: "center",
     marginTop: 18,
     marginBottom: 18,
     borderRadius: 24,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
   },
   swiperContainer: { borderRadius: 24 },
   swiperSlide: { flex: 1 },
@@ -1034,16 +1075,21 @@ const styles = StyleSheet.create({
   },
   ctaCard: {
     flex: 1,
-    borderRadius: 24,
-    padding: 18,
+    borderRadius: 28,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-    elevation: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 12,
   },
-  ctaPrimary: { backgroundColor: "#5EC6C6" },
-  ctaSecondary: { backgroundColor: "#67D1C8", opacity: 0.96 },
+  ctaGradient: {
+    flex: 1,
+    padding: 18,
+    minHeight: 200,
+  },
+  ctaPrimary: {},
+  ctaSecondary: {},
 
   ctaTopRow: { 
     flexDirection: "row", 
@@ -1051,68 +1097,86 @@ const styles = StyleSheet.create({
     justifyContent: "space-between" 
   },
   ctaIcon: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.75)",
+    backgroundColor: "rgba(255,255,255,0.9)",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  ctaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  ctaPill: {
-    backgroundColor: "rgba(255,255,255,0.90)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+  ctaPillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22C55E",
   },
-  ctaPillAlt: { backgroundColor: "rgba(255,255,255,0.85)" },
+  ctaPillAlt: {},
   ctaPillText: { 
     fontSize: 10, 
     fontWeight: "900", 
     letterSpacing: 0.8, 
-    color: "#0f1a19" 
+    color: "#35736E" 
   },
 
+  ctaContent: {
+    flex: 1,
+    justifyContent: "center",
+    marginTop: 16,
+  },
   ctaTitle: { 
-    marginTop: 14, 
-    fontSize: 20, 
+    fontSize: 22, 
     fontWeight: "900", 
     color: "#0f1a19",
     letterSpacing: 0.3,
   },
   ctaSub: { 
-    marginTop: 8, 
-    fontSize: 13, 
+    marginTop: 6, 
+    fontSize: 12, 
     lineHeight: 18, 
-    color: "rgba(15,26,25,0.80)", 
-    fontWeight: "800" 
+    color: "rgba(15,26,25,0.70)", 
+    fontWeight: "700" 
   },
   ctaBottom: {
     marginTop: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.65)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    backgroundColor: "rgba(0,0,0,0.08)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
   },
   ctaGo: { 
     fontSize: 14, 
     fontWeight: "900", 
     color: "#0f1a19",
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
+  },
+  ctaArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#35736E",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   /* Ad center */

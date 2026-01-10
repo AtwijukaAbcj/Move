@@ -23,6 +23,7 @@ import { fetchProviderServiceById } from "../api/providerServiceDetail";
 import { createBooking } from "../api";
 import { useAuth } from "../app/auth-context"; // ✅ adjust if you moved auth-context elsewhere
 import { addNotification } from "../utils/notifications";
+import { trackBooking } from "../utils/bookingStatusPoller";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const BASE_URL = "http://192.168.1.31:8000";
@@ -78,7 +79,7 @@ export default function ServiceDetailScreen() {
     setLoading(true);
     setError(null);
 
-    fetchProviderServiceById(id, token)
+    fetchProviderServiceById(Number(id), token ?? undefined)
       .then((data) => {
         setService(data);
         setLoading(false);
@@ -514,8 +515,13 @@ export default function ServiceDetailScreen() {
                         return;
                       }
                       
+                      if (!service?.id) {
+                        setBookingError("Service information is missing. Please try again.");
+                        return;
+                      }
+                      
                       console.log("Creating service booking...", {
-                        provider_service: (service as any).id,
+                        provider_service: service.id,
                         customer: user.id,
                         phone: bookingPhone,
                         number_of_cars: numberOfCars,
@@ -527,7 +533,7 @@ export default function ServiceDetailScreen() {
                       
                       const bookingResult = await createBooking(
                         {
-                          provider_service: (service as any).id,
+                          provider_service: service.id,
                           customer: user.id,
                           phone: bookingPhone,
                           number_of_cars: numberOfCars,
@@ -541,16 +547,61 @@ export default function ServiceDetailScreen() {
                       
                       setBookingSuccess(true);
                       
-                      // Add notification for successful booking
+                      // Add notification for service booking
                       const customerId = await AsyncStorage.getItem("customerId");
                       if (customerId) {
+                        const status = bookingResult?.status || 'pending';
+                        
+                        // Define status-specific messages
+                        const statusMessages: Record<string, { title: string; message: string }> = {
+                          pending: { 
+                            title: 'Service Booked! 📅', 
+                            message: `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} is being processed.` 
+                          },
+                          confirmed: { 
+                            title: 'Booking Confirmed! ✅', 
+                            message: `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} at ${bookingTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} is confirmed.` 
+                          },
+                          in_progress: { 
+                            title: 'Service In Progress! 🔧', 
+                            message: `Your service "${service.title}" is now in progress.` 
+                          },
+                          completed: { 
+                            title: 'Service Completed! ✅', 
+                            message: `Your service "${service.title}" has been completed. Thank you!` 
+                          }
+                        };
+                        
+                        const statusInfo = statusMessages[status] || {
+                          title: 'Booking Created! 🎉',
+                          message: `Your booking for "${service.title}" has been created.`
+                        };
+                        
+                        // Create notification for all bookings
                         await addNotification(
                           customerId,
-                          'Booking Confirmed! 🎉',
-                          `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} at ${bookingTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} has been confirmed.`,
+                          statusInfo.title,
+                          statusInfo.message,
                           'service',
-                          { bookingId: bookingResult?.id, serviceTitle: service.title }
+                          { bookingId: bookingResult?.id, serviceTitle: service.title, status: status }
                         );
+                        console.log('Notification created successfully');
+                        
+                        // Track pending bookings for status updates
+                        if (status === 'pending') {
+                          await trackBooking(
+                            customerId,
+                            bookingResult?.id,
+                            status,
+                            'service',
+                            {
+                              serviceTitle: service.title,
+                              date: bookingDate.toLocaleDateString(),
+                              time: bookingTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }
+                          );
+                          console.log('Booking tracked for future status updates');
+                        }
                       }
                       
                       setTimeout(() => {
