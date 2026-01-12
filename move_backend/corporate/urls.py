@@ -15,9 +15,12 @@ from .api_views import (
     ChatSendMessageAPIView, ChatMessagesAPIView, ChatMarkReadAPIView, ChatUnreadCountAPIView,
     BookingTrackingAPIView, CancelBookingAPIView
 )
+
 from .api_views_provider_service import ProviderServiceListView
+from .api_views_site import SiteSettingView
 
 urlpatterns = [
+    path('site-setting/', SiteSettingView.as_view(), name='site-setting'),
     path('driver/<int:driver_id>/save-push-token/', SaveDriverPushTokenAPIView.as_view(), name='driver-save-push-token'),
     path('customer/<int:customer_id>/save-push-token/', SaveCustomerPushTokenAPIView.as_view(), name='customer-save-push-token'),
     path('send-test-push/', SendTestPushNotificationAPIView.as_view(), name='send-test-push'),

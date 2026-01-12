@@ -1,6 +1,13 @@
 from django.contrib import admin
 
 from .models import Advert, Driver, Customer, User, Booking, ServiceBooking, RideOffer
+from .models_site import SiteSetting
+
+# Register SiteSetting for admin logo management
+@admin.register(SiteSetting)
+class SiteSettingAdmin(admin.ModelAdmin):
+    list_display = ("site_name", "logo", "updated_at")
+    search_fields = ("site_name",)
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
