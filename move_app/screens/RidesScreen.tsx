@@ -354,13 +354,13 @@ export default function RidesScreen() {
             <Text style={styles.cancelRideBtnText}>Cancel Ride</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.backHomeBtn}
             onPress={() => router.push('/home')}
             activeOpacity={0.9}
           >
             <Text style={styles.backHomeBtnText}>Back to Home</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           
           {/* Spacer for floating nav */}
           <View style={{ height: 100 }} />

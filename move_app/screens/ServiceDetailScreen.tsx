@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  Dimensions,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -21,12 +23,13 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ProviderService } from "../models/ProviderService";
 import { fetchProviderServiceById } from "../api/providerServiceDetail";
 import { createBooking } from "../api";
-import { useAuth } from "../app/auth-context"; // ✅ adjust if you moved auth-context elsewhere
+import { useAuth } from "../app/auth-context";
 import { addNotification } from "../utils/notifications";
 import { trackBooking } from "../utils/bookingStatusPoller";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const BASE_URL = "http://192.168.1.31:8000";
+const { width } = Dimensions.get("window");
 
 function resolveImg(img?: string | null) {
   if (!img) return null;
@@ -41,14 +44,16 @@ function money(amount: any, currency?: string) {
 
 export default function ServiceDetailScreen() {
   const { providerServiceId } = useLocalSearchParams();
-  const { token, user } = useAuth(); // ✅ Get user from auth context
+  const { token, user } = useAuth();
 
   const [service, setService] = useState<ProviderService | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ Image modal (slider)
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const sliderRef = useRef<FlatList<string>>(null);
 
   // booking
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
@@ -88,7 +93,7 @@ export default function ServiceDetailScreen() {
         setError("Failed to fetch service details.");
         setLoading(false);
       });
-  }, [id]);
+  }, [id, token]);
 
   const images = useMemo(() => {
     if (!service) return [];
@@ -104,9 +109,10 @@ export default function ServiceDetailScreen() {
   const headerTitle = service?.title || "Service Details";
 
   const pricePerCar = money((service as any)?.base_price, (service as any)?.currency) || "Price on request";
-  const totalPriceText = numberOfCars > 1 
-    ? `${money(totalPrice, (service as any)?.currency)} (${numberOfCars} cars)`
-    : pricePerCar;
+  const totalPriceText =
+    numberOfCars > 1
+      ? `${money(totalPrice, (service as any)?.currency)} (${numberOfCars} cars)`
+      : pricePerCar;
 
   const stats = useMemo(
     () => [
@@ -133,6 +139,29 @@ export default function ServiceDetailScreen() {
     ],
     [service]
   );
+
+  const openSliderAt = (index: number) => {
+    const safeIndex = Math.max(0, Math.min(index, images.length - 1));
+    setActiveIndex(safeIndex);
+    setModalVisible(true);
+
+    // ensure FlatList is mounted before scrolling
+    setTimeout(() => {
+      sliderRef.current?.scrollToIndex({ index: safeIndex, animated: false });
+    }, 0);
+  };
+
+  const onPrev = () => {
+    const next = Math.max(0, activeIndex - 1);
+    setActiveIndex(next);
+    sliderRef.current?.scrollToIndex({ index: next, animated: true });
+  };
+
+  const onNext = () => {
+    const next = Math.min(images.length - 1, activeIndex + 1);
+    setActiveIndex(next);
+    sliderRef.current?.scrollToIndex({ index: next, animated: true });
+  };
 
   if (loading) {
     return (
@@ -172,10 +201,7 @@ export default function ServiceDetailScreen() {
           {images[0] ? (
             <TouchableOpacity
               activeOpacity={0.95}
-              onPress={() => {
-                setSelectedImage(images[0]);
-                setModalVisible(true);
-              }}
+              onPress={() => openSliderAt(0)}
             >
               <View style={styles.hero}>
                 <Image source={{ uri: images[0] }} style={styles.heroImg} resizeMode="cover" />
@@ -212,19 +238,12 @@ export default function ServiceDetailScreen() {
 
           {/* THUMBNAILS */}
           {images.length > 1 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.thumbScroll}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbScroll}>
               {images.slice(1).map((img, idx) => (
                 <TouchableOpacity
                   key={idx}
                   activeOpacity={0.9}
-                  onPress={() => {
-                    setSelectedImage(img);
-                    setModalVisible(true);
-                  }}
+                  onPress={() => openSliderAt(idx + 1)}
                   style={styles.thumbWrap}
                 >
                   <Image source={{ uri: img }} style={styles.thumbImg} resizeMode="cover" />
@@ -249,7 +268,7 @@ export default function ServiceDetailScreen() {
                 "No description provided."}
             </Text>
 
-            {/* SERVICE DETAILS (extra fields) */}
+            {/* SERVICE DETAILS */}
             <View style={{ marginTop: 14 }}>
               <Text style={{ color: "#fff", fontWeight: "900", marginBottom: 8 }}>
                 Service details
@@ -326,7 +345,7 @@ export default function ServiceDetailScreen() {
           </View>
         </ScrollView>
 
-        {/* IMAGE MODAL */}
+        {/* ✅ IMAGE SLIDER MODAL (swipe left/right) */}
         <Modal
           visible={modalVisible}
           transparent
@@ -335,22 +354,63 @@ export default function ServiceDetailScreen() {
         >
           <View style={styles.modalBg}>
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} />
-            <View style={styles.modalBody}>
-              {selectedImage ? (
-                <Image source={{ uri: selectedImage }} style={styles.modalImg} resizeMode="contain" />
-              ) : null}
-              <TouchableOpacity
-                style={styles.modalClose}
-                onPress={() => setModalVisible(false)}
-                activeOpacity={0.85}
-              >
+
+            <View style={styles.sliderWrap}>
+              <FlatList
+                ref={sliderRef}
+                data={images}
+                keyExtractor={(item, i) => `${item}-${i}`}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                initialScrollIndex={activeIndex}
+                getItemLayout={(_, index) => ({
+                  length: width,
+                  offset: width * index,
+                  index,
+                })}
+                onMomentumScrollEnd={(e) => {
+                  const i = Math.round(e.nativeEvent.contentOffset.x / width);
+                  setActiveIndex(i);
+                }}
+                renderItem={({ item }) => (
+                  <View style={{ width, justifyContent: "center", alignItems: "center" }}>
+                    <Image source={{ uri: item }} style={styles.modalImg} resizeMode="contain" />
+                  </View>
+                )}
+              />
+
+              <TouchableOpacity style={styles.modalClose} onPress={() => setModalVisible(false)} activeOpacity={0.85}>
                 <Ionicons name="close" size={18} color="#fff" />
               </TouchableOpacity>
+
+              {images.length > 1 ? (
+                <>
+                  <TouchableOpacity style={[styles.arrowBtn, { left: 12 }]} onPress={onPrev} activeOpacity={0.85}>
+                    <Ionicons name="chevron-back" size={22} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.arrowBtn, { right: 12 }]} onPress={onNext} activeOpacity={0.85}>
+                    <Ionicons name="chevron-forward" size={22} color="#fff" />
+                  </TouchableOpacity>
+                </>
+              ) : null}
+
+              <View style={styles.dotsRow}>
+                {images.map((_, i) => (
+                  <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
+                ))}
+              </View>
+
+              <View style={styles.counterPill}>
+                <Text style={styles.counterText}>
+                  {activeIndex + 1}/{images.length}
+                </Text>
+              </View>
             </View>
           </View>
         </Modal>
 
-        {/* BOOKING MODAL */}
+        {/* ✅ BOOKING MODAL (UNCHANGED FEATURES) */}
         <Modal
           visible={bookingModalVisible}
           transparent
@@ -408,7 +468,7 @@ export default function ServiceDetailScreen() {
                     <Text style={styles.passengerText}>Max {totalPassengers} passengers</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.carSelectorControls}>
                   <TouchableOpacity
                     style={[styles.carButton, numberOfCars <= 1 && styles.carButtonDisabled]}
@@ -418,12 +478,12 @@ export default function ServiceDetailScreen() {
                   >
                     <Ionicons name="remove" size={20} color={numberOfCars <= 1 ? "#6B7280" : "#fff"} />
                   </TouchableOpacity>
-                  
+
                   <View style={styles.carCountContainer}>
                     <Ionicons name="car-outline" size={24} color="#5EC6C6" />
                     <Text style={styles.carCountText}>{numberOfCars}</Text>
                   </View>
-                  
+
                   <TouchableOpacity
                     style={[styles.carButton, numberOfCars >= 10 && styles.carButtonDisabled]}
                     onPress={() => setNumberOfCars(Math.min(10, numberOfCars + 1))}
@@ -436,26 +496,19 @@ export default function ServiceDetailScreen() {
 
                 <View style={styles.priceBreakdown}>
                   <Text style={styles.priceBreakdownText}>
-                    {pricePerCar} × {numberOfCars} car{numberOfCars > 1 ? 's' : ''} = <Text style={styles.totalPriceText}>{money(totalPrice, (service as any)?.currency)}</Text>
+                    {pricePerCar} × {numberOfCars} car{numberOfCars > 1 ? "s" : ""} ={" "}
+                    <Text style={styles.totalPriceText}>{money(totalPrice, (service as any)?.currency)}</Text>
                   </Text>
                 </View>
               </View>
 
               <View style={styles.pickerRow}>
-                <TouchableOpacity
-                  style={[styles.picker, { flex: 1 }]}
-                  activeOpacity={0.9}
-                  onPress={() => setShowDatePicker(true)}
-                >
+                <TouchableOpacity style={[styles.picker, { flex: 1 }]} activeOpacity={0.9} onPress={() => setShowDatePicker(true)}>
                   <Ionicons name="calendar-outline" size={16} color="#B0BEC5" />
                   <Text style={styles.pickerText}>{bookingDate.toLocaleDateString()}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.picker, { flex: 1 }]}
-                  activeOpacity={0.9}
-                  onPress={() => setShowTimePicker(true)}
-                >
+                <TouchableOpacity style={[styles.picker, { flex: 1 }]} activeOpacity={0.9} onPress={() => setShowTimePicker(true)}>
                   <Ionicons name="time-outline" size={16} color="#B0BEC5" />
                   <Text style={styles.pickerText}>
                     {bookingTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -488,9 +541,7 @@ export default function ServiceDetailScreen() {
               )}
 
               {!token ? (
-                <Text style={styles.msgError}>
-                  You must be logged in to book. Please login and try again.
-                </Text>
+                <Text style={styles.msgError}>You must be logged in to book. Please login and try again.</Text>
               ) : null}
 
               {bookingError ? <Text style={styles.msgError}>{bookingError}</Text> : null}
@@ -498,10 +549,7 @@ export default function ServiceDetailScreen() {
 
               <View style={styles.sheetBtnRow}>
                 <TouchableOpacity
-                  style={[
-                    styles.primaryBtn,
-                    (bookingLoading || !token) && { opacity: 0.6 },
-                  ]}
+                  style={[styles.primaryBtn, (bookingLoading || !token) && { opacity: 0.6 }]}
                   disabled={bookingLoading || !token}
                   activeOpacity={0.92}
                   onPress={async () => {
@@ -514,23 +562,12 @@ export default function ServiceDetailScreen() {
                         setBookingError("Please login to book this service");
                         return;
                       }
-                      
+
                       if (!service?.id) {
                         setBookingError("Service information is missing. Please try again.");
                         return;
                       }
-                      
-                      console.log("Creating service booking...", {
-                        provider_service: service.id,
-                        customer: user.id,
-                        phone: bookingPhone,
-                        number_of_cars: numberOfCars,
-                        total_passengers: totalPassengers,
-                        total_price: totalPrice,
-                        date: bookingDate.toISOString().split("T")[0],
-                        time: bookingTime.toTimeString().slice(0, 5),
-                      });
-                      
+
                       const bookingResult = await createBooking(
                         {
                           provider_service: service.id,
@@ -544,91 +581,75 @@ export default function ServiceDetailScreen() {
                         },
                         token
                       );
-                      
+
                       setBookingSuccess(true);
-                      
-                      // Add notification for service booking
+
                       const customerId = await AsyncStorage.getItem("customerId");
                       if (customerId) {
-                        const status = bookingResult?.status || 'pending';
-                        
-                        // Define status-specific messages
+                        const status = bookingResult?.status || "pending";
+
                         const statusMessages: Record<string, { title: string; message: string }> = {
-                          pending: { 
-                            title: 'Service Booked! 📅', 
-                            message: `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} is being processed.` 
+                          pending: {
+                            title: "Service Booked! 📅",
+                            message: `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} is being processed.`,
                           },
-                          confirmed: { 
-                            title: 'Booking Confirmed! ✅', 
-                            message: `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} at ${bookingTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} is confirmed.` 
+                          confirmed: {
+                            title: "Booking Confirmed! ✅",
+                            message: `Your booking for "${service.title}" on ${bookingDate.toLocaleDateString()} at ${bookingTime.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })} is confirmed.`,
                           },
-                          in_progress: { 
-                            title: 'Service In Progress! 🔧', 
-                            message: `Your service "${service.title}" is now in progress.` 
+                          in_progress: {
+                            title: "Service In Progress! 🔧",
+                            message: `Your service "${service.title}" is now in progress.`,
                           },
-                          completed: { 
-                            title: 'Service Completed! ✅', 
-                            message: `Your service "${service.title}" has been completed. Thank you!` 
-                          }
+                          completed: {
+                            title: "Service Completed! ✅",
+                            message: `Your service "${service.title}" has been completed. Thank you!`,
+                          },
                         };
-                        
+
                         const statusInfo = statusMessages[status] || {
-                          title: 'Booking Created! 🎉',
-                          message: `Your booking for "${service.title}" has been created.`
+                          title: "Booking Created! 🎉",
+                          message: `Your booking for "${service.title}" has been created.`,
                         };
-                        
-                        // Create notification for all bookings
-                        await addNotification(
-                          customerId,
-                          statusInfo.title,
-                          statusInfo.message,
-                          'service',
-                          { bookingId: bookingResult?.id, serviceTitle: service.title, status: status }
-                        );
-                        console.log('Notification created successfully');
-                        
-                        // Track pending bookings for status updates
-                        if (status === 'pending') {
-                          await trackBooking(
-                            customerId,
-                            bookingResult?.id,
-                            status,
-                            'service',
-                            {
-                              serviceTitle: service.title,
-                              date: bookingDate.toLocaleDateString(),
-                              time: bookingTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            }
-                          );
-                          console.log('Booking tracked for future status updates');
+
+                        await addNotification(customerId, statusInfo.title, statusInfo.message, "service", {
+                          bookingId: bookingResult?.id,
+                          serviceTitle: service.title,
+                          status: status,
+                        });
+
+                        if (status === "pending") {
+                          await trackBooking(customerId, bookingResult?.id, status, "service", {
+                            serviceTitle: service.title,
+                            date: bookingDate.toLocaleDateString(),
+                            time: bookingTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                          });
                         }
                       }
-                      
+
                       setTimeout(() => {
                         setBookingModalVisible(false);
                         setBookingSuccess(false);
                       }, 2000);
                     } catch (error: any) {
-                      console.error("Booking error:", error);
-                      console.error("Error response:", error?.response?.data);
-                      console.error("Error status:", error?.response?.status);
-                      const errorMsg = error?.response?.data?.detail || error?.response?.data?.error || JSON.stringify(error?.response?.data) || "Booking failed. Please try again.";
+                      const errorMsg =
+                        error?.response?.data?.detail ||
+                        error?.response?.data?.error ||
+                        JSON.stringify(error?.response?.data) ||
+                        "Booking failed. Please try again.";
                       setBookingError(errorMsg);
                     } finally {
                       setBookingLoading(false);
                     }
                   }}
                 >
-                  <Text style={styles.primaryText}>
-                    {bookingLoading ? "Booking..." : "Confirm booking"}
-                  </Text>
+                  <Text style={styles.primaryText}>{bookingLoading ? "Booking..." : "Confirm booking"}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  activeOpacity={0.92}
-                  onPress={() => setBookingModalVisible(false)}
-                >
+                <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.92} onPress={() => setBookingModalVisible(false)}>
                   <Text style={styles.secondaryText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
@@ -786,13 +807,14 @@ const styles = StyleSheet.create({
   },
   ctaBtnText: { color: "#0f1a19", fontWeight: "900" },
 
+  // slider modal styles
   modalBg: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.92)",
     justifyContent: "center",
     alignItems: "center",
   },
-  modalBody: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
+  sliderWrap: { flex: 1, width: "100%", justifyContent: "center", alignItems: "center" },
   modalImg: { width: "92%", height: "72%", borderRadius: 18, backgroundColor: "#1F232B" },
   modalClose: {
     position: "absolute",
@@ -805,6 +827,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  arrowBtn: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -22,
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotsRow: {
+    position: "absolute",
+    bottom: 26,
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.35)" },
+  dotActive: { backgroundColor: "#5EC6C6" },
+  counterPill: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 60 : 40,
+    left: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  counterText: { color: "#fff", fontWeight: "900" },
 
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.70)", justifyContent: "flex-end" },
   sheet: {
@@ -853,13 +905,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   input: { flex: 1, color: "#fff", fontWeight: "700" },
-  helperText: { 
-    color: "#9AA4B2", 
-    fontSize: 12, 
-    fontWeight: "600", 
-    marginTop: -6, 
+  helperText: {
+    color: "#9AA4B2",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: -6,
     marginBottom: 10,
-    paddingHorizontal: 4
+    paddingHorizontal: 4,
   },
 
   pickerRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
@@ -877,47 +929,36 @@ const styles = StyleSheet.create({
   pickerText: { color: "#fff", fontWeight: "800" },
 
   carSelectorContainer: {
-    backgroundColor: '#2D313A',
+    backgroundColor: "#2D313A",
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(94, 198, 198, 0.2)',
+    borderColor: "rgba(94, 198, 198, 0.2)",
   },
   carSelectorHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
-  carSelectorTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  carSelectorSubtitle: {
-    color: '#B0BEC5',
-    fontSize: 12,
-    marginTop: 2,
-  },
+  carSelectorTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  carSelectorSubtitle: { color: "#B0BEC5", fontSize: 12, marginTop: 2 },
   passengerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-    backgroundColor: 'rgba(94, 198, 198, 0.15)',
+    backgroundColor: "rgba(94, 198, 198, 0.15)",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
   },
-  passengerText: {
-    color: '#5EC6C6',
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  passengerText: { color: "#5EC6C6", fontSize: 12, fontWeight: "700" },
+
   carSelectorControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 24,
     marginBottom: 12,
   },
@@ -925,64 +966,35 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#5EC6C6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#5EC6C6",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
-  carButtonDisabled: {
-    backgroundColor: '#3D4350',
-    opacity: 0.5,
-  },
+  carButtonDisabled: { backgroundColor: "#3D4350", opacity: 0.5 },
   carCountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    backgroundColor: '#23272F',
+    backgroundColor: "#23272F",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 16,
     minWidth: 100,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
-  carCountText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  priceBreakdown: {
-    backgroundColor: '#23272F',
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  priceBreakdownText: {
-    color: '#B0BEC5',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  totalPriceText: {
-    color: '#FFA726',
-    fontSize: 16,
-    fontWeight: '900',
-  },
+  carCountText: { color: "#fff", fontSize: 24, fontWeight: "900" },
 
-  msgError: {
-    color: "#FFB4A2",
-    textAlign: "center",
-    fontWeight: "900",
-    marginTop: 4,
-  },
-  msgSuccess: {
-    color: "#5EC6C6",
-    textAlign: "center",
-    fontWeight: "900",
-    marginTop: 4,
-  },
+  priceBreakdown: { backgroundColor: "#23272F", padding: 12, borderRadius: 12, alignItems: "center" },
+  priceBreakdownText: { color: "#B0BEC5", fontSize: 14, fontWeight: "600" },
+  totalPriceText: { color: "#FFA726", fontSize: 16, fontWeight: "900" },
+
+  msgError: { color: "#FFB4A2", textAlign: "center", fontWeight: "900", marginTop: 4 },
+  msgSuccess: { color: "#5EC6C6", textAlign: "center", fontWeight: "900", marginTop: 4 },
 
   sheetBtnRow: { flexDirection: "row", gap: 10, marginTop: 10, marginBottom: 6 },
   primaryBtn: {

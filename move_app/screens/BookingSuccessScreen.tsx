@@ -130,7 +130,7 @@ export default function BookingSuccessScreen() {
         <View style={{ width: 40 }} />
         <Text style={styles.headerTitle}>Booking Confirmed</Text>
         <TouchableOpacity
-          onPress={() => router.push("/home")}
+          onPress={() => router.push("/(tabs)/home")}
           style={styles.closeBtn}
           activeOpacity={0.9}
         >
@@ -314,13 +314,13 @@ export default function BookingSuccessScreen() {
           <Text style={styles.trackBtnText}>Track Your Ride</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.homeBtn}
           activeOpacity={0.9}
           onPress={() => router.push("/home")}
         >
           <Text style={styles.homeBtnText}>Back to Home</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );
